@@ -1,5 +1,5 @@
 "use client";
-
+import { supabase } from '../supabase';
 import { useEffect, useState } from 'react';
 import liff from '@line/liff';
 import Calendar from 'react-calendar';
@@ -39,29 +39,45 @@ export default function Home() {
     setSelectedTime(null); // 日付が変わったら時間はリセット
   };
 
-// 「予約を確定する」ボタンを押したときの処理
-  const handleReserve = () => {
+// 「予約を確定する」ボタンを押したときの処理（asyncを付けます）
+  const handleReserve = async () => {
     if (!selectedDate || !selectedTime) return;
 
-    // 送信するメッセージの文章を作る
     const dateStr = selectedDate.toLocaleDateString('ja-JP');
-    const messageText = `【来場予約が確定しました】\n\nお名前: ${displayName}様\n日時: ${dateStr} ${selectedTime}`;
 
-    // LINEのトーク画面にメッセージを自動送信する
-    liff
-      .sendMessages([
+    try {
+      // 1. Supabaseの「reservations」テーブルにデータを保存する
+      const { error } = await supabase
+        .from('reservations')
+        .insert([
+          {
+            user_name: displayName || '不明なユーザー',
+            user_id: liff.getContext()?.userId || '不明なID',
+            reserve_date: dateStr,
+            reserve_time: selectedTime,
+          },
+        ]);
+
+      // もしデータベース保存でエラーが起きたらここでストップ
+      if (error) {
+        throw new Error('データベースへの保存に失敗しました: ' + error.message);
+      }
+
+      // 2. データベース保存が成功したら、LINEのトーク画面にメッセージを自動送信する
+      const messageText = `【来場予約が確定しました】\n\nお名前: ${displayName}様\n日時: ${dateStr} ${selectedTime}`;
+      await liff.sendMessages([
         {
           type: 'text',
           text: messageText,
         },
-      ])
-      .then(() => {
-        // 送信が成功したら、LIFFアプリを自動で閉じる
-        liff.closeWindow();
-      })
-      .catch((err) => {
-        alert('メッセージ送信に失敗しました: ' + err.toString());
-      });
+      ]);
+
+      // 3. すべて成功したら、LIFFアプリを自動で閉じる
+      liff.closeWindow();
+
+    } catch (err: any) {
+      alert('エラーが発生しました: ' + err.message);
+    }
   };
 
   if (liffError) {
