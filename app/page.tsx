@@ -12,7 +12,7 @@ export default function Home() {
     // LINEのミニアプリ（LIFF）を起動する設定
     liff
       .init({
-        liffId: 'ここに後でLINEのIDを入れます', 
+        liffId: '2010515590-mKz3DfbF', 
       })
       .then(() => {
         // LINEアプリ内で開かれているかチェック
