@@ -39,6 +39,31 @@ export default function Home() {
     setSelectedTime(null); // 日付が変わったら時間はリセット
   };
 
+// 「予約を確定する」ボタンを押したときの処理
+  const handleReserve = () => {
+    if (!selectedDate || !selectedTime) return;
+
+    // 送信するメッセージの文章を作る
+    const dateStr = selectedDate.toLocaleDateString('ja-JP');
+    const messageText = `【来場予約が確定しました】\n\nお名前: ${displayName}様\n日時: ${dateStr} ${selectedTime}`;
+
+    // LINEのトーク画面にメッセージを自動送信する
+    liff
+      .sendMessages([
+        {
+          type: 'text',
+          text: messageText,
+        },
+      ])
+      .then(() => {
+        // 送信が成功したら、LIFFアプリを自動で閉じる
+        liff.closeWindow();
+      })
+      .catch((err) => {
+        alert('メッセージ送信に失敗しました: ' + err.toString());
+      });
+  };
+
   if (liffError) {
     return <div className="p-4 text-red-500">LIFFエラー: {liffError}</div>;
   }
@@ -92,6 +117,7 @@ export default function Home() {
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-lg">
         <button
           disabled={!selectedDate || !selectedTime}
+          onClick={handleReserve}
           className={`w-full rounded-xl py-4 text-center font-bold text-white transition-all ${
             selectedDate && selectedTime
               ? 'bg-green-600 hover:bg-green-700 active:scale-95'
