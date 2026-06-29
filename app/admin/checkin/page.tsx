@@ -1,5 +1,5 @@
 "use client";
-import { supabase } from '../../../../supabase';
+import { supabase } from '../../../supabase';
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
@@ -32,11 +32,11 @@ function CheckinContent() {
                 .eq('id', id)
                 .maybeSingle();
 
-            if (fetchError || !resData) {
-                setCheckinStatus('error');
-                setLoading(false);
-                return;
-            }
+            // if (fetchError || !resData) {
+            //     setCheckinStatus('error');
+            //     setLoading(false);
+            //     return;
+            // }
 
             setStudentInfo(resData);
 
