@@ -46,3 +46,19 @@ export interface Slot {
   reservation_count?: number;
   event_type: string;
 }
+
+export interface Reservation {
+  id: string;
+  created_at: string;
+  last_name: string;
+  first_name: string;
+  email: string;
+  phone: string;
+  faculty: string;
+  department: string;
+  prefecture: string;
+  city: string;
+  status: string;
+  slot_id: string;
+}
+

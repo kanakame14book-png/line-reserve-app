@@ -16,6 +16,9 @@ function HomeContent() {
   const [slots, setSlots] = useState<Slot[]>([]);
   const [selectedSlotId, setSelectedSlotId] = useState<string>('');
 
+  // 🌟 既存の登録データがあるかを保持するState
+  const [existingReservation, setExistingReservation] = useState<any>(null);
+
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [lastName, setLastName] = useState('');
@@ -38,6 +41,32 @@ function HomeContent() {
     setDepartment('');
   };
 
+  // データの読み込み処理を共通化
+  const loadMyData = async () => {
+    const { data } = await supabase
+      .from('reservations')
+      .select('*')
+      .eq('line_user_id', liff.getContext()?.userId)
+      .maybeSingle();
+
+    if (data) {
+      setExistingReservation(data); // 🌟 既存データを保存
+      setLastName(data.last_name || '');
+      setFirstName(data.first_name || '');
+      setLastNameKana(data.last_name_kana || '');
+      setFirstNameKana(data.first_name_kana || '');
+      setEmail(data.email || '');
+      setPhone(data.phone || '');
+      setPrefecture(data.prefecture || '');
+      setCity(data.city || '');
+      setFaculty(data.faculty || '');
+      setDepartment(data.department || '');
+      setSelectedSlotId(data.slot_id || '');
+    } else {
+      setExistingReservation(null);
+    }
+  };
+
   useEffect(() => {
     const initApp = async () => {
       try {
@@ -47,27 +76,7 @@ function HomeContent() {
         } else {
           const profile = await liff.getProfile();
           setDisplayName(profile.displayName);
-
-          // 自分のデータを読み込み
-          const { data } = await supabase
-            .from('reservations')
-            .select('*')
-            .eq('line_user_id', liff.getContext()?.userId)
-            .maybeSingle();
-
-          if (data) {
-            setLastName(data.last_name || '');
-            setFirstName(data.first_name || '');
-            setLastNameKana(data.last_name_kana || '');
-            setFirstNameKana(data.first_name_kana || '');
-            setEmail(data.email || '');
-            setPhone(data.phone || '');
-            setPrefecture(data.prefecture || '');
-            setCity(data.city || '');
-            setFaculty(data.faculty || '');
-            setDepartment(data.department || '');
-            setSelectedSlotId(data.slot_id || '');
-          }
+          await loadMyData();
         }
       } catch (err: any) {
         setLiffError(err.toString());
@@ -114,30 +123,55 @@ function HomeContent() {
     fetchSlotsAndReservations();
   }, []);
 
+  // 🌟 削除（キャンセル）処理
+  const handleCancelReservation = async () => {
+    if (!confirm(`本当にこの${existingReservation.status}をキャンセルしますか？\n登録されていたデータはすべて削除されます。`)) return;
+
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from('reservations')
+        .delete()
+        .eq('line_user_id', liff.getContext()?.userId);
+
+      if (error) throw error;
+
+      // LINEにキャンセル完了通知を飛ばす
+      const cancelMessage = `【${existingReservation.status}のキャンセルが完了しました】\n\nまたのご利用をお待ちしております。`;
+      await liff.sendMessages([{ type: 'text', text: cancelMessage }]);
+
+      alert(`${existingReservation.status}をキャンセルしました。`);
+      liff.closeWindow();
+    } catch (err: any) {
+      alert('キャンセル処理に失敗しました: ' + err.message);
+      setIsSubmitting(false);
+    }
+  };
+
   const handleReserve = async () => {
-    if (!prefecture || !faculty || !department) {
+    if (!email || !prefecture || !faculty || !department) {
       alert('必須項目(*)を入力してください');
       return;
     }
+
     if (isOfficial) {
       if (!selectedSlotId) {
         alert('日時を選択してください');
         return;
       }
-      if (!lastName || !firstName || !lastNameKana || !firstNameKana || !email || !phone || !city) {
+      if (!lastName || !firstName || !lastNameKana || !firstNameKana || !phone || !city) {
         alert('本登録には全必須項目を入力してください');
         return;
       }
     }
 
     const targetSlot = slots.find(s => s.id === selectedSlotId);
-    if (targetSlot && targetSlot.reservation_count !== undefined && targetSlot.reservation_count >= targetSlot.capacity) {
+    if (isOfficial && targetSlot && targetSlot.reservation_count !== undefined && targetSlot.reservation_count >= targetSlot.capacity) {
       alert('申し訳ありません。満席になってしまいました。別の時間をお選びください。');
       return;
     }
 
     setIsSubmitting(true);
-
     const cleanData = (val: string) => (val === "" ? null : val);
 
     try {
@@ -145,21 +179,22 @@ function HomeContent() {
         line_user_name: displayName || '不明なユーザー',
         line_user_id: liff.getContext()?.userId || '不明なID',
         slot_id: (isOfficial && selectedSlotId) ? selectedSlotId : null,
-        last_name: lastName,
-        first_name: firstName,
-        last_name_kana: lastNameKana,
-        first_name_kana: firstNameKana,
-        email: email,
-        phone: phone,
-        faculty: faculty,
-        department: department,
+        last_name: cleanData(lastName),
+        first_name: cleanData(firstName),
+        last_name_kana: cleanData(lastNameKana),
+        first_name_kana: cleanData(firstNameKana),
+        email: cleanData(email),
+        phone: cleanData(phone),
+        faculty: cleanData(faculty),
+        department: cleanData(department),
         prefecture: prefecture,
-        city: city,
+        city: cleanData(city),
         attendee_count: attendeeCount,
         admission_type: admissionType || null,
         motivation_level: motivationLevel || null,
         status: currentStatusText,
       }], { onConflict: 'line_user_id' });
+
       if (error) throw new Error('データベースへの保存に失敗しました: ' + error.message);
 
       const dateStr = targetSlot
@@ -180,6 +215,7 @@ function HomeContent() {
   };
 
   const isFormValid =
+    email &&
     prefecture &&
     faculty &&
     department &&
@@ -189,9 +225,10 @@ function HomeContent() {
       firstName &&
       lastNameKana &&
       firstNameKana &&
-      email &&
       phone &&
       city) : true);
+
+  if (liffError) return <div className="p-4 text-red-500">LIFFエラー: {liffError}</div>;
 
   return (
     <main className="min-h-screen bg-gray-50 p-4 pb-28 font-sans text-gray-800">
@@ -199,18 +236,28 @@ function HomeContent() {
         <h1 className="text-xl font-bold text-green-600">
           {isOfficial ? '【合格者対象】本登録フォーム' : '予約フォーム（仮登録）'}
         </h1>
-        <p className="text-xs text-gray-500 mt-2 bg-white p-2 rounded border border-gray-100 shadow-sm">
-          {isOfficial
-            ? '💡 合格が決定された方向けの、入学前オリエンテーション予約画面です。'
-            : '💡 合格発表前の方向けの予約画面です。'
-          }
-        </p>
       </header>
+
+      {/* 🌟 既存の予約がある場合、最上部にキャンセル導線を表示 */}
+      {existingReservation && (
+        <section className="mb-6 rounded-xl bg-amber-50 border border-amber-200 p-4 shadow-sm flex justify-between items-center">
+          <div>
+            <p className="text-sm font-bold text-amber-800">すでに【{existingReservation.status}】のデータがあります</p>
+            <p className="text-xs text-gray-500 mt-0.5">変更する場合は下のフォームから再送信、取り消す場合は右のボタンを押してください。</p>
+          </div>
+          <button
+            onClick={handleCancelReservation}
+            disabled={isSubmitting}
+            className="bg-white border border-red-200 hover:bg-red-50 text-red-500 text-xs font-bold px-3 py-2 rounded-lg whitespace-nowrap transition-all shadow-sm"
+          >
+            キャンセルする
+          </button>
+        </section>
+      )}
 
       {isOfficial && (
         <section className="mb-6 rounded-xl bg-white p-4 shadow-sm">
           <h2 className="mb-3 font-semibold text-gray-700">1. ご希望の日時を選択</h2>
-          {/* （カレンダー・スロット選択部分） */}
           {loading ? (
             <p className="text-sm text-gray-500 text-center py-4">予約枠を読み込み中...</p>
           ) : slots.length === 0 ? (
@@ -261,6 +308,7 @@ function HomeContent() {
 
       <section className="mb-6 rounded-xl bg-white p-4 shadow-sm">
         <h2 className="mb-4 font-semibold text-gray-700 border-b pb-2">2. 来場者情報の入力</h2>
+
         {isOfficial && (
           <>
             <div className="mb-4">
@@ -278,15 +326,17 @@ function HomeContent() {
               </div>
             </div>
             <div className="mb-4">
-              <label className="block text-sm font-bold mb-1 text-gray-600">メールアドレス <span className="text-red-500">*</span></label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@yamanashi.ac.jp" className="w-full p-2 border rounded-lg" required />
-            </div>
-            <div className="mb-4">
               <label className="block text-sm font-bold mb-1 text-gray-600">電話番号 <span className="text-red-500">*</span></label>
               <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="090-1234-5678" className="w-full p-2 border rounded-lg" required />
             </div>
           </>
         )}
+
+        <div className="mb-4">
+          <label className="block text-sm font-bold mb-1 text-gray-600">メールアドレス <span className="text-red-500">*</span></label>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@yamanashi.ac.jp" className="w-full p-2 border rounded-lg" required />
+        </div>
+
         <div className="mb-4">
           <label className="block text-sm font-bold mb-1 text-gray-600">お住まいの都道府県 <span className="text-red-500">*</span></label>
           <select value={prefecture} onChange={(e) => setPrefecture(e.target.value)} className="w-full p-2 border rounded-lg bg-white" required>
@@ -294,6 +344,7 @@ function HomeContent() {
             {PREFECTURES.map((pref) => <option key={pref} value={pref}>{pref}</option>)}
           </select>
         </div>
+
         {isOfficial && (
           <>
             <div className="mb-4">
@@ -308,6 +359,7 @@ function HomeContent() {
             </div>
           </>
         )}
+
         <div className="mb-4">
           <label className="block text-sm font-bold mb-1 text-gray-600">興味のある学部 <span className="text-red-500">*</span></label>
           <select value={faculty} onChange={handleFacultyChange} className="w-full p-2 border rounded-lg bg-white" required>
