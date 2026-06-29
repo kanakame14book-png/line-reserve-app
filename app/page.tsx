@@ -175,7 +175,8 @@ function HomeContent() {
     }
   };
 
-  const isFormValid = selectedSlotId && lastName && firstName && lastNameKana && firstNameKana && email && phone && prefecture && city && faculty && department;
+  const isOfficialFormValid = selectedSlotId && lastName && firstName && lastNameKana && firstNameKana && email && phone && prefecture && city && faculty && department;
+  const isFormValid = prefecture && faculty && department;
 
   return (
     <main className="min-h-screen bg-gray-50 p-4 pb-28 font-sans text-gray-800">
@@ -322,16 +323,33 @@ function HomeContent() {
         </div>
       </section>
 
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-lg z-50">
-        <button
-          disabled={!isFormValid || isSubmitting}
-          onClick={handleReserve}
-          className={`w-full rounded-xl py-4 text-center font-bold text-white transition-all ${isFormValid && !isSubmitting ? 'bg-green-600 hover:bg-green-700 active:scale-95 shadow-md' : 'bg-gray-300 cursor-not-allowed'}`}
-        >
-          {isSubmitting ? '予約を送信中...' : isFormValid ? `この内容で${currentStatusText}を確定する` : '日時と必要事項を入力してください'}
-        </button>
-      </div>
-      <div className="h-24"></div>
+      {isOfficial ? (
+        <>
+          <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-lg z-50">
+            <button
+              disabled={!isOfficialFormValid || isSubmitting}
+              onClick={handleReserve}
+              className={`w-full rounded-xl py-4 text-center font-bold text-white transition-all ${isOfficialFormValid && !isSubmitting ? 'bg-green-600 hover:bg-green-700 active:scale-95 shadow-md' : 'bg-gray-300 cursor-not-allowed'}`}
+            >
+              {isSubmitting ? '予約を送信中...' : isOfficialFormValid ? `この内容で${currentStatusText}を確定する` : '日時と必要事項を入力してください'}
+            </button>
+          </div>
+          <div className="h-24"></div>
+        </>
+      ) : (
+        <>
+          <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-lg z-50">
+            <button
+              disabled={!isFormValid || isSubmitting}
+              onClick={handleReserve}
+              className={`w-full rounded-xl py-4 text-center font-bold text-white transition-all ${isFormValid && !isSubmitting ? 'bg-green-600 hover:bg-green-700 active:scale-95 shadow-md' : 'bg-gray-300 cursor-not-allowed'}`}
+            >
+              {isSubmitting ? '予約を送信中...' : isFormValid ? `この内容で${currentStatusText}を確定する` : '日時と必要事項を入力してください'}
+            </button>
+          </div>
+          <div className="h-24"></div>
+        </>
+      )}
     </main>
   );
 }
