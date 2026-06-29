@@ -120,7 +120,7 @@ function HomeContent() {
     try {
       const { error } = await supabase
         .from('reservations')
-        .insert([
+        .upsert([
           {
             line_user_name: displayName || '不明なユーザー',
             line_user_id: liff.getContext()?.userId || '不明なID',
@@ -140,7 +140,7 @@ function HomeContent() {
             motivation_level: motivationLevel || null,
             status: currentStatusText,
           },
-        ]);
+        ], { onConflict: 'line_user_id' });
 
       if (error) throw new Error('データベースへの保存に失敗しました: ' + error.message);
 
