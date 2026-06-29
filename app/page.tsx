@@ -52,7 +52,7 @@ function HomeContent() {
           const { data } = await supabase
             .from('reservations')
             .select('*')
-            .eq('line_user_id::text', liff.getContext()?.userId)
+            .eq('line_user_id', liff.getContext()?.userId)
             .maybeSingle();
 
           if (data) {
@@ -138,11 +138,13 @@ function HomeContent() {
 
     setIsSubmitting(true);
 
+    const cleanData = (val: string) => (val === "" ? null : val);
+
     try {
       const { error } = await supabase.from('reservations').upsert([{
         line_user_name: displayName || '不明なユーザー',
         line_user_id: liff.getContext()?.userId || '不明なID',
-        slot_id: selectedSlotId,
+        slot_id: (isOfficial && selectedSlotId) ? selectedSlotId : null,
         last_name: lastName,
         first_name: firstName,
         last_name_kana: lastNameKana,
