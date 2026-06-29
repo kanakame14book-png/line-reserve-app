@@ -15,10 +15,9 @@ function HomeContent() {
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [selectedSlotId, setSelectedSlotId] = useState<string>('');
-
-  // 🌟 既存の登録データがあるかを保持するState
   const [existingReservation, setExistingReservation] = useState<any>(null);
 
+  // 🌟 メールアドレスは本登録のみ管理（初期値空文字）
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [lastName, setLastName] = useState('');
@@ -41,7 +40,6 @@ function HomeContent() {
     setDepartment('');
   };
 
-  // データの読み込み処理を共通化
   const loadMyData = async () => {
     const { data } = await supabase
       .from('reservations')
@@ -50,7 +48,7 @@ function HomeContent() {
       .maybeSingle();
 
     if (data) {
-      setExistingReservation(data); // 🌟 既存データを保存
+      setExistingReservation(data);
       setLastName(data.last_name || '');
       setFirstName(data.first_name || '');
       setLastNameKana(data.last_name_kana || '');
@@ -123,32 +121,22 @@ function HomeContent() {
     fetchSlotsAndReservations();
   }, []);
 
-  // 🌟 削除（キャンセル）処理
   const handleCancelReservation = async () => {
-    if (!confirm(`本当にこの${existingReservation.status}をキャンセルしますか？\n登録されていたデータはすべて削除されます。`)) return;
-
+    if (!confirm(`本当にこの${existingReservation.status}をキャンセルしますか？`)) return;
     setIsSubmitting(true);
     try {
-      const { error } = await supabase
-        .from('reservations')
-        .delete()
-        .eq('line_user_id', liff.getContext()?.userId);
-
-      if (error) throw error;
-
-      // LINEにキャンセル完了通知を飛ばす
-      const cancelMessage = `【${existingReservation.status}のキャンセルが完了しました】\n\nまたのご利用をお待ちしております。`;
-      await liff.sendMessages([{ type: 'text', text: cancelMessage }]);
-
+      await supabase.from('reservations').delete().eq('line_user_id', liff.getContext()?.userId);
+      await liff.sendMessages([{ type: 'text', text: `【${existingReservation.status}のキャンセルが完了しました】` }]);
       alert(`${existingReservation.status}をキャンセルしました。`);
       liff.closeWindow();
     } catch (err: any) {
-      alert('キャンセル処理に失敗しました: ' + err.message);
+      alert('キャンセル失敗: ' + err.message);
       setIsSubmitting(false);
     }
   };
 
   const handleReserve = async () => {
+    // 🌟 仮登録の必須項目から email を完全に除外
     if (!prefecture || !faculty || !department) {
       alert('必須項目(*)を入力してください');
       return;
@@ -159,6 +147,7 @@ function HomeContent() {
         alert('日時を選択してください');
         return;
       }
+      // 🌟 本登録のときだけ email の入力を厳格にチェック
       if (!lastName || !firstName || !lastNameKana || !firstNameKana || !email || !phone || !city) {
         alert('本登録には全必須項目を入力してください');
         return;
@@ -175,7 +164,8 @@ function HomeContent() {
     const cleanData = (val: string) => (val === "" ? null : val);
 
     try {
-      const { error } = await supabase.from('reservations').upsert([{
+      // 🌟 返ってきたレコードのID（UUID）を取得できるように .select() を末尾に追加
+      const { data: insertedData, error } = await supabase.from('reservations').upsert([{
         line_user_name: displayName || '不明なユーザー',
         line_user_id: liff.getContext()?.userId || '不明なID',
         slot_id: (isOfficial && selectedSlotId) ? selectedSlotId : null,
@@ -193,7 +183,7 @@ function HomeContent() {
         admission_type: admissionType || null,
         motivation_level: motivationLevel || null,
         status: currentStatusText,
-      }], { onConflict: 'line_user_id' });
+      }], { onConflict: 'line_user_id' }).select().single();
 
       if (error) throw new Error('データベースへの保存に失敗しました: ' + error.message);
 
@@ -201,8 +191,12 @@ function HomeContent() {
         ? new Date(targetSlot.start_time).toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
         : '';
 
+      // 🌟 自動生成される受付票のURL（本番環境に合わせてドメイン部分は調整してください）
+      const ticketUrl = `${window.location.origin}/admin/ticket?id=${insertedData.id}`;
+
+      // 🌟 本登録確定時に、LINEトーク画面へ受付票のURLを自動で叩き込むメッセージを構成
       const messageText = isOfficial
-        ? `【来場予約（本登録）が確定しました】\n\n合格おめでとうございます！🎉\n応援センターの予約を受付いたしました。\n\n形式: ${targetSlot?.event_type || '対面'}\n日時: ${dateStr}~\nお名前: ${lastName} 様\n\n大学でお会いできるのを楽しみにしております！`
+        ? `【来場予約（本登録）が確定しました】\n\n合格おめでとうございます！🎉\n応援センターの予約を受付いたしました。\n\n形式: ${targetSlot?.event_type || '対面'}\n日時: ${dateStr}~\nお名前: ${lastName} 様\n\n👇当日の受付票はこちら（スマホでご提示ください）\n${ticketUrl}`
         : `【仮登録が確定しました】\n\nお名前: ${displayName} 様\n\n山梨大学への合格をご祈念しております！`;
 
       await liff.sendMessages([{ type: 'text', text: messageText }]);
@@ -214,6 +208,7 @@ function HomeContent() {
     }
   };
 
+  // 🌟 ボタンの活性化バリデーションからも仮登録時の email 縛りを解除
   const isFormValid =
     prefecture &&
     faculty &&
@@ -238,18 +233,13 @@ function HomeContent() {
         </h1>
       </header>
 
-      {/* 🌟 既存の予約がある場合、最上部にキャンセル導線を表示 */}
       {existingReservation && (
         <section className="mb-6 rounded-xl bg-amber-50 border border-amber-200 p-4 shadow-sm flex justify-between items-center">
           <div>
             <p className="text-sm font-bold text-amber-800">すでに【{existingReservation.status}】のデータがあります</p>
             <p className="text-xs text-gray-500 mt-0.5">変更する場合は下のフォームから再送信、取り消す場合は右のボタンを押してください。</p>
           </div>
-          <button
-            onClick={handleCancelReservation}
-            disabled={isSubmitting}
-            className="bg-white border border-red-200 hover:bg-red-50 text-red-500 text-xs font-bold px-3 py-2 rounded-lg whitespace-nowrap transition-all shadow-sm"
-          >
+          <button onClick={handleCancelReservation} disabled={isSubmitting} className="bg-white border border-red-200 hover:bg-red-50 text-red-500 text-xs font-bold px-3 py-2 rounded-lg whitespace-nowrap transition-all shadow-sm">
             キャンセルする
           </button>
         </section>
@@ -309,6 +299,7 @@ function HomeContent() {
       <section className="mb-6 rounded-xl bg-white p-4 shadow-sm">
         <h2 className="mb-4 font-semibold text-gray-700 border-b pb-2">2. 来場者情報の入力</h2>
 
+        {/* 🌟 本登録のときだけ名前・ふりがな・電話番号・メールアドレスを表示 */}
         {isOfficial && (
           <>
             <div className="mb-4">
