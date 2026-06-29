@@ -271,6 +271,7 @@ function AdminContent() {
                                     <th className="p-3">都道府県</th>
                                     <th className="p-3">メールアドレス</th>
                                     <th className="p-3">登録日時</th>
+                                    <th className="p-3 text-center">アクション</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 text-sm">
@@ -288,6 +289,14 @@ function AdminContent() {
                                             <td className="p-3 text-gray-600">{res.prefecture}</td>
                                             <td className="p-3 text-gray-600">{res.email}</td>
                                             <td className="p-3 text-xs text-gray-400">{new Date(res.created_at).toLocaleString('ja-JP')}</td>
+                                            <td className="p-3 text-center">
+                                                <button
+                                                    onClick={() => window.open(`/admin/ticket?id=${res.id}`, '_blank')}
+                                                    className="bg-white border border-gray-200 text-gray-700 font-bold text-xs px-2.5 py-1.5 rounded hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
+                                                >
+                                                    🎫 受付票
+                                                </button>
+                                            </td>
                                         </tr>
                                     ))
                                 )}

@@ -149,7 +149,7 @@ function HomeContent() {
   };
 
   const handleReserve = async () => {
-    if (!email || !prefecture || !faculty || !department) {
+    if (!prefecture || !faculty || !department) {
       alert('必須項目(*)を入力してください');
       return;
     }
@@ -159,7 +159,7 @@ function HomeContent() {
         alert('日時を選択してください');
         return;
       }
-      if (!lastName || !firstName || !lastNameKana || !firstNameKana || !phone || !city) {
+      if (!lastName || !firstName || !lastNameKana || !firstNameKana || !email || !phone || !city) {
         alert('本登録には全必須項目を入力してください');
         return;
       }
@@ -215,7 +215,6 @@ function HomeContent() {
   };
 
   const isFormValid =
-    email &&
     prefecture &&
     faculty &&
     department &&
@@ -225,6 +224,7 @@ function HomeContent() {
       firstName &&
       lastNameKana &&
       firstNameKana &&
+      email &&
       phone &&
       city) : true);
 
@@ -329,13 +329,12 @@ function HomeContent() {
               <label className="block text-sm font-bold mb-1 text-gray-600">電話番号 <span className="text-red-500">*</span></label>
               <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="090-1234-5678" className="w-full p-2 border rounded-lg" required />
             </div>
+            <div className="mb-4">
+              <label className="block text-sm font-bold mb-1 text-gray-600">メールアドレス <span className="text-red-500">*</span></label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@yamanashi.ac.jp" className="w-full p-2 border rounded-lg" required />
+            </div>
           </>
         )}
-
-        <div className="mb-4">
-          <label className="block text-sm font-bold mb-1 text-gray-600">メールアドレス <span className="text-red-500">*</span></label>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@yamanashi.ac.jp" className="w-full p-2 border rounded-lg" required />
-        </div>
 
         <div className="mb-4">
           <label className="block text-sm font-bold mb-1 text-gray-600">お住まいの都道府県 <span className="text-red-500">*</span></label>
