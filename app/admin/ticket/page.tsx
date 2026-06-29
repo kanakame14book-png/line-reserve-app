@@ -1,5 +1,5 @@
 "use client";
-import { supabase } from '../../../supabase';
+import { supabase } from '../../supabase';
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
@@ -19,23 +19,21 @@ function TicketContent() {
 
         const fetchTicketData = async () => {
             try {
-                // 1. 予約データの取得
                 const { data: resData, error: resError } = await supabase
                     .from('reservations')
                     .select('*')
                     .eq('id', resId)
-                    .single();
+                    .maybeSingle(); // 🌟 安全のため maybeSingle に変更
 
                 if (resError) throw resError;
                 setReservation(resData);
 
-                // 2. 紐づく予約枠（日時）の取得（本登録の場合のみ）
-                if (resData.slot_id) {
+                if (resData && resData.slot_id) {
                     const { data: slotData } = await supabase
                         .from('slots')
                         .select('*')
                         .eq('id', resData.slot_id)
-                        .single();
+                        .maybeSingle();
                     setSlot(slotData);
                 }
             } catch (err) {
@@ -48,7 +46,6 @@ function TicketContent() {
         fetchTicketData();
     }, [resId]);
 
-    // 印刷を実行する関数
     const handlePrint = () => {
         window.print();
     };
@@ -56,16 +53,15 @@ function TicketContent() {
     if (loading) return <div className="p-8 text-center text-gray-500">受付票を生成中...</div>;
     if (!reservation) return <div className="p-8 text-center text-red-500 font-bold">⚠️ 該当する予約データが見つかりません。</div>;
 
-    // QRコードに埋め込む文字（当日の受付用などに予約IDを仕込む）
+    // 🌟 より高速で安定したQRコード生成APIに変更（サイズも200x200にアップ）
     const qrValue = encodeURIComponent(`https://your-domain.com/admin/checkin?id=${reservation.id}`);
-    const qrSrc = `https://chart.googleapis.com/chart?chs=150x150&cht=qr&chl=${qrValue}&choe=UTF-8`;
+    const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${qrValue}`;
 
     const isOfficial = reservation.status === '本登録';
 
     return (
         <main className="min-h-screen bg-gray-50 py-10 px-4 flex flex-col items-center justify-start font-sans text-gray-800 print:bg-white print:py-0">
 
-            {/* 🌟 印刷用コントロール（印刷するときは画面から消えます） */}
             <div className="w-full max-w-md flex justify-between mb-6 print:hidden">
                 <button onClick={() => window.close()} className="text-sm text-gray-500 hover:text-gray-700 font-medium">
                     ← 閉じる
@@ -75,10 +71,7 @@ function TicketContent() {
                 </button>
             </div>
 
-            {/* 🌟 受付票の本体（ここがA4サイズ等できれいに収まるデザイン） */}
             <div className="w-full max-w-md bg-white border border-gray-200 rounded-2xl shadow-sm p-6 relative print:border-0 print:shadow-none">
-
-                {/* 外枠の飾り線 */}
                 <div className="absolute inset-4 border-2 border-dashed border-gray-100 pointer-events-none rounded-xl print:border-gray-300"></div>
 
                 <div className="text-center mb-6 relative">
@@ -86,16 +79,16 @@ function TicketContent() {
                         }`}>
                         来場受付票（{reservation.status}）
                     </span>
-                    <h1 className="text-xl font-bold text-gray-900 tracking-wider">山梨大学 生活協同組合</h1>
-                    <p className="text-xs text-gray-400 mt-1">for New Student</p>
+                    <h1 className="text-xl font-bold text-gray-900 tracking-wider">山梨大学 工学部</h1>
+                    <p className="text-xs text-gray-400 mt-1">Orientation & Laboratory Tour</p>
                 </div>
 
-                {/* ユーザー情報 */}
                 <div className="space-y-4 border-t border-b border-gray-100 py-4 mb-6 relative print:border-gray-300">
                     <div>
                         <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">お名前</label>
                         <p className="text-lg font-bold text-gray-900 mt-0.5">
-                            {reservation.last_name ? `${reservation.last_name} ${reservation.firstName || reservation.first_name}` : `${reservation.line_user_name} 様`}
+                            {/* 🌟 firstName のタイポを first_name に完全修正 */}
+                            {reservation.last_name ? `${reservation.last_name} ${reservation.first_name}` : `${reservation.line_user_name} 様`}
                             {reservation.last_name_kana && <span className="text-xs text-gray-400 font-normal ml-2">({reservation.last_name_kana})</span>}
                         </p>
                     </div>
@@ -111,7 +104,6 @@ function TicketContent() {
                         </div>
                     </div>
 
-                    {/* 本登録（日時がある場合）のみ表示 */}
                     {isOfficial && slot ? (
                         <div>
                             <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">ご予約日時</label>
@@ -129,7 +121,6 @@ function TicketContent() {
                     )}
                 </div>
 
-                {/* QRコードエリア */}
                 <div className="flex flex-col items-center justify-center text-center relative">
                     <div className="bg-gray-50 p-2 rounded-xl border border-gray-100 mb-2 print:bg-white print:border-gray-300">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
