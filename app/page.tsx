@@ -178,15 +178,18 @@ function HomeContent() {
   };
 
   const isFormValid =
-    selectedSlotId &&
-    lastName &&
-    firstName &&
-    lastNameKana &&
-    firstNameKana &&
-    email &&
-    phone &&
-    city &&
-    (isOfficial ? (prefecture && faculty && department) : true);
+    prefecture &&
+    faculty &&
+    department &&
+    (isOfficial ? (
+      selectedSlotId &&
+      lastName &&
+      firstName &&
+      lastNameKana &&
+      firstNameKana &&
+      email &&
+      phone &&
+      city) : true);
 
   return (
     <main className="min-h-screen bg-gray-50 p-4 pb-28 font-sans text-gray-800">
