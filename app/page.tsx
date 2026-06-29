@@ -120,7 +120,7 @@ function HomeContent() {
       return;
     }
     if (isOfficial && !lastName || !firstName || !lastNameKana || !firstNameKana || !email || !prefecture || !faculty || !department) {
-      alert('必須項目(*)を入力してください');
+      alert('必須項目(z*)を入力してください');
       return;
     }
     if (!email || !prefecture || !faculty || !department) {
