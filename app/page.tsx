@@ -10,6 +10,7 @@ interface Slot {
   start_time: string;
   capacity: number;
   reservation_count?: number; // 現在の予約数を裏でカウントして残席計算に使います
+  event_type: string;
 }
 
 export default function Home() {
@@ -151,7 +152,7 @@ export default function Home() {
         : '';
 
       // 2. LINEのトーク画面にメッセージを自動送信
-      const messageText = `【来場予約が確定しました】\n\n日時: ${dateStr}~\nお名前: ${lastName} 様\n来場人数: ${attendeeCount} 名\n\nご来場を心よりお待ちしております！`;
+      const messageText = `【来場予約が確定しました】\n\n形式: ${targetSlot?.event_type || '対面'}\n日時: ${dateStr}~\nお名前: ${firstName} 様\n来場人数: ${attendeeCount} 名\n\nご来場を心よりお待ちしております！`;
       await liff.sendMessages([
         {
           type: 'text',
@@ -212,8 +213,19 @@ export default function Home() {
                     }`}
                 >
                   <div>
-                    <span className="font-bold mr-2">{dateStr}</span>
-                    <span className="text-lg font-semibold">{timeStr} 〜</span>
+                    <div className="flex items-center gap-2 mb-1">
+                      {/* 🌟 開催形式のバッジを追加 */}
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded ${slot.event_type === 'オンライン'
+                        ? 'bg-purple-100 text-purple-700'
+                        : 'bg-blue-100 text-blue-700'
+                        }`}>
+                        {slot.event_type}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="font-bold mr-2">{dateStr}</span>
+                      <span className="text-lg font-semibold">{timeStr} 〜</span>
+                    </div>
                   </div>
                   <div className="text-xs font-medium">
                     {isFull ? (
