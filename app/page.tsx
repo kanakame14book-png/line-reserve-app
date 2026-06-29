@@ -60,7 +60,7 @@ function HomeContent() {
           const { data } = await supabase
             .from('reservations')
             .select('*')
-            .eq('line_user_id', liff.getContext()?.userId)
+            .eq('line_user_id::text', liff.getContext()?.userId)
             .single();
 
           if (data) {
