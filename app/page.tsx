@@ -115,7 +115,7 @@ function HomeContent() {
   }, []);
 
   const handleReserve = async () => {
-    if (!email || !prefecture || !faculty || !department) {
+    if (!prefecture || !faculty || !department) {
       alert('必須項目(*)を入力してください');
       return;
     }
@@ -124,7 +124,7 @@ function HomeContent() {
         alert('日時を選択してください');
         return;
       }
-      if (!lastName || !firstName || !lastNameKana || !firstNameKana) {
+      if (!lastName || !firstName || !lastNameKana || !firstNameKana || !email || !phone || !city) {
         alert('本登録には全必須項目を入力してください');
         return;
       }
