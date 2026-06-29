@@ -61,7 +61,7 @@ function HomeContent() {
             .from('reservations')
             .select('*')
             .eq('line_user_id::text', liff.getContext()?.userId)
-            .single();
+            .maybeSingle();
 
           if (data) {
             setLastName(data.last_name || '');
