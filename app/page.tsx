@@ -15,12 +15,14 @@ interface Slot {
 export default function Home() {
   const [liffError, setLiffError] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
-  
+
   // 🔹 状態管理（State）の整理
   const [slots, setSlots] = useState<Slot[]>([]);              // 取得した予約枠一覧
   const [selectedSlotId, setSelectedSlotId] = useState<string>(''); // 選択された枠のID
-  const [realName, setRealName] = useState('');                 // 本名
-  const [realNameKana, setRealNameKana] = useState('');         // ふりがな
+  const [lastName, setLastName] = useState('');                 // 姓
+  const [firstName, setFirstName] = useState('');               // 名
+  const [lastNameKana, setLastNameKana] = useState('');         // せい
+  const [firstNameKana, setFirstNameKana] = useState('');       // めい
   const [prefecture, setPrefecture] = useState('');             // 都道府県
   const [city, setCity] = useState('');                         // 市区町村
   const [faculty, setFaculty] = useState('');                   // 学部
@@ -33,7 +35,7 @@ export default function Home() {
   // 学部が変わったときに学科をリセットする処理
   const handleFacultyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setFaculty(e.target.value);
-    setDepartment(''); 
+    setDepartment('');
   };
 
   useEffect(() => {
@@ -104,7 +106,7 @@ export default function Home() {
       alert('予約する枠が選択されていません');
       return;
     }
-    if (!realName || !realNameKana || !prefecture || !city || !faculty || !department) {
+    if (!lastName || !firstName || !lastNameKana || !firstNameKana || !prefecture || !city || !faculty || !department) {
       alert('必須項目（*マーク）が入力されていません');
       return;
     }
@@ -124,9 +126,11 @@ export default function Home() {
           {
             line_user_name: displayName || '不明なユーザー',
             line_user_id: liff.getContext()?.userId || '不明なID',
-            slot_id: selectedSlotId, 
-            real_name: realName,
-            real_name_kana: realNameKana,
+            slot_id: selectedSlotId,
+            last_name: lastName,
+            first_name: firstName,
+            last_name_kana: lastNameKana,
+            first_name_kana: firstNameKana,
             faculty: faculty,
             department: department,
             prefecture: prefecture,
@@ -142,12 +146,12 @@ export default function Home() {
       }
 
       // LINE送信用の日時文字列を作成
-      const dateStr = targetSlot 
+      const dateStr = targetSlot
         ? new Date(targetSlot.start_time).toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
         : '';
 
       // 2. LINEのトーク画面にメッセージを自動送信
-      const messageText = `【来場予約が確定しました】\n\n日時: ${dateStr}~\nお名前: ${realName} 様\n来場人数: ${attendeeCount} 名\n\nご来場を心よりお待ちしております！`;
+      const messageText = `【来場予約が確定しました】\n\n日時: ${dateStr}~\nお名前: ${lastName} 様\n来場人数: ${attendeeCount} 名\n\nご来場を心よりお待ちしております！`;
       await liff.sendMessages([
         {
           type: 'text',
@@ -190,7 +194,7 @@ export default function Home() {
               const slotDate = new Date(slot.start_time);
               const dateStr = slotDate.toLocaleDateString('ja-JP', { weekday: 'short', month: 'short', day: 'numeric' });
               const timeStr = slotDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-              
+
               const currentResCount = slot.reservation_count || 0;
               const isFull = currentResCount >= slot.capacity;
               const remaining = slot.capacity - currentResCount;
@@ -200,13 +204,12 @@ export default function Home() {
                   key={slot.id}
                   disabled={isFull}
                   onClick={() => setSelectedSlotId(slot.id)}
-                  className={`flex items-center justify-between rounded-lg p-3 border text-left transition-all ${
-                    isFull
-                      ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                      : selectedSlotId === slot.id
+                  className={`flex items-center justify-between rounded-lg p-3 border text-left transition-all ${isFull
+                    ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                    : selectedSlotId === slot.id
                       ? 'bg-green-50 border-green-500 ring-2 ring-green-500/20 text-green-900'
                       : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
-                  }`}
+                    }`}
                 >
                   <div>
                     <span className="font-bold mr-2">{dateStr}</span>
@@ -230,30 +233,50 @@ export default function Home() {
       <section className="mb-6 rounded-xl bg-white p-4 shadow-sm">
         <h2 className="mb-4 font-semibold text-gray-700 border-b pb-2">2. 来場者情報の入力</h2>
 
-        {/* 本名 */}
+        {/* お名前（姓・名） */}
         <div className="mb-4">
-          <label className="block text-sm font-bold mb-1 text-gray-600">お名前（本名） <span className="text-red-500">*</span></label>
-          <input
-            type="text"
-            value={realName}
-            onChange={(e) => setRealName(e.target.value)}
-            placeholder="山田 太郎"
-            className="w-full p-2 border rounded-lg focus:outline-none focus:border-green-500"
-            required
-          />
+          <label className="block text-sm font-bold mb-1 text-gray-600">お名前 <span className="text-red-500">*</span></label>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              placeholder="山田"
+              className="w-full p-2 border rounded-lg focus:outline-none focus:border-green-500"
+              required
+            />
+            <input
+              type="text"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              placeholder="太郎"
+              className="w-full p-2 border rounded-lg focus:outline-none focus:border-green-500"
+              required
+            />
+          </div>
         </div>
 
-        {/* ふりがな */}
+        {/* フリガナ（せい・めい） */}
         <div className="mb-4">
           <label className="block text-sm font-bold mb-1 text-gray-600">ふりがな <span className="text-red-500">*</span></label>
-          <input
-            type="text"
-            value={realNameKana}
-            onChange={(e) => setRealNameKana(e.target.value)}
-            placeholder="やまだ たろう"
-            className="w-full p-2 border rounded-lg focus:outline-none focus:border-green-500"
-            required
-          />
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              value={lastNameKana}
+              onChange={(e) => setLastNameKana(e.target.value)}
+              placeholder="やまだ"
+              className="w-full p-2 border rounded-lg focus:outline-none focus:border-green-500"
+              required
+            />
+            <input
+              type="text"
+              value={firstNameKana}
+              onChange={(e) => setFirstNameKana(e.target.value)}
+              placeholder="たろう"
+              className="w-full p-2 border rounded-lg focus:outline-none focus:border-green-500"
+              required
+            />
+          </div>
         </div>
 
         {/* 都道府県 */}
@@ -369,13 +392,12 @@ export default function Home() {
       {/* 固定の予約確定ボタンエリア */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-lg z-50">
         <button
-          disabled={!selectedSlotId || !realName || !realNameKana || !prefecture || !city || !faculty || !department}
+          disabled={!selectedSlotId || !lastName || !firstName || !lastNameKana || !firstNameKana || !prefecture || !city || !faculty || !department}
           onClick={handleReserve}
-          className={`w-full rounded-xl py-4 text-center font-bold text-white transition-all ${
-            selectedSlotId && realName && realNameKana && prefecture && city && faculty && department
-              ? 'bg-green-600 hover:bg-green-700 active:scale-95 shadow-md'
-              : 'bg-gray-300 cursor-not-allowed'
-          }`}
+          className={`w-full rounded-xl py-4 text-center font-bold text-white transition-all ${selectedSlotId && lastName && firstName && lastNameKana && firstNameKana && prefecture && city && faculty && department
+            ? 'bg-green-600 hover:bg-green-700 active:scale-95 shadow-md'
+            : 'bg-gray-300 cursor-not-allowed'
+            }`}
         >
           {selectedSlotId ? 'この内容で予約を確定する' : '日時と必要事項を入力してください'}
         </button>
