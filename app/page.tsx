@@ -115,17 +115,19 @@ function HomeContent() {
   }, []);
 
   const handleReserve = async () => {
-    if (isOfficial && !selectedSlotId) {
-      alert('日時を選択してください');
-      return;
-    }
-    if (isOfficial && !lastName || !firstName || !lastNameKana || !firstNameKana || !email || !prefecture || !faculty || !department) {
-      alert('必須項目(z*)を入力してください');
-      return;
-    }
     if (!email || !prefecture || !faculty || !department) {
       alert('必須項目(*)を入力してください');
       return;
+    }
+    if (isOfficial) {
+      if (!selectedSlotId) {
+        alert('日時を選択してください');
+        return;
+      }
+      if (!lastName || !firstName || !lastNameKana || !firstNameKana || !email || !prefecture || !faculty || !department) {
+        alert('本登録には全必須項目を入力してください');
+        return;
+      }
     }
 
     const targetSlot = slots.find(s => s.id === selectedSlotId);
@@ -175,8 +177,16 @@ function HomeContent() {
     }
   };
 
-  const isOfficialFormValid = selectedSlotId && lastName && firstName && lastNameKana && firstNameKana && email && phone && prefecture && city && faculty && department;
-  const isFormValid = prefecture && faculty && department;
+  const isFormValid =
+    selectedSlotId &&
+    lastName &&
+    firstName &&
+    lastNameKana &&
+    firstNameKana &&
+    email &&
+    phone &&
+    city &&
+    (isOfficial ? (prefecture && faculty && department) : true);
 
   return (
     <main className="min-h-screen bg-gray-50 p-4 pb-28 font-sans text-gray-800">
@@ -323,33 +333,16 @@ function HomeContent() {
         </div>
       </section>
 
-      {isOfficial ? (
-        <>
-          <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-lg z-50">
-            <button
-              disabled={!isOfficialFormValid || isSubmitting}
-              onClick={handleReserve}
-              className={`w-full rounded-xl py-4 text-center font-bold text-white transition-all ${isOfficialFormValid && !isSubmitting ? 'bg-green-600 hover:bg-green-700 active:scale-95 shadow-md' : 'bg-gray-300 cursor-not-allowed'}`}
-            >
-              {isSubmitting ? '予約を送信中...' : isOfficialFormValid ? `この内容で${currentStatusText}を確定する` : '日時と必要事項を入力してください'}
-            </button>
-          </div>
-          <div className="h-24"></div>
-        </>
-      ) : (
-        <>
-          <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-lg z-50">
-            <button
-              disabled={!isFormValid || isSubmitting}
-              onClick={handleReserve}
-              className={`w-full rounded-xl py-4 text-center font-bold text-white transition-all ${isFormValid && !isSubmitting ? 'bg-green-600 hover:bg-green-700 active:scale-95 shadow-md' : 'bg-gray-300 cursor-not-allowed'}`}
-            >
-              {isSubmitting ? '予約を送信中...' : isFormValid ? `この内容で${currentStatusText}を確定する` : '日時と必要事項を入力してください'}
-            </button>
-          </div>
-          <div className="h-24"></div>
-        </>
-      )}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-lg z-50">
+        <button
+          disabled={!isFormValid || isSubmitting}
+          onClick={handleReserve}
+          className={`w-full rounded-xl py-4 text-center font-bold text-white transition-all ${isFormValid && !isSubmitting ? 'bg-green-600 hover:bg-green-700 active:scale-95 shadow-md' : 'bg-gray-300 cursor-not-allowed'}`}
+        >
+          {isSubmitting ? '予約を送信中...' : isFormValid ? `この内容で${currentStatusText}を確定する` : '日時と必要事項を入力してください'}
+        </button>
+      </div>
+      <div className="h-24"></div>
     </main>
   );
 }
