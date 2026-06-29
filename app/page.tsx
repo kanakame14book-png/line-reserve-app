@@ -124,7 +124,7 @@ function HomeContent() {
         alert('日時を選択してください');
         return;
       }
-      if (!lastName || !firstName || !lastNameKana || !firstNameKana || !email || !prefecture || !faculty || !department) {
+      if (!lastName || !firstName || !lastNameKana || !firstNameKana) {
         alert('本登録には全必須項目を入力してください');
         return;
       }
