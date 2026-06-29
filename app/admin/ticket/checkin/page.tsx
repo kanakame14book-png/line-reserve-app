@@ -1,5 +1,5 @@
 "use client";
-import { supabase } from '../../../supabase';
+import { supabase } from '../../../../supabase';
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
