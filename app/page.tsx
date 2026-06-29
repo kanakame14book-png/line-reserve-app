@@ -2,6 +2,7 @@
 import { supabase } from '../supabase';
 import { useEffect, useState } from 'react';
 import liff from '@line/liff';
+import { useSearchParams } from 'next/navigation'; // 🌟 URLパラメーターを読み取るために追加
 import { PREFECTURES, FACULTY_DEPARTMENT_MAP, FACULTIES, ADMISSION_TYPES, MOTIVATION_LEVELS } from '../data/options';
 
 interface Slot {
@@ -13,16 +14,21 @@ interface Slot {
 }
 
 export default function Home() {
+  const searchParams = useSearchParams(); // 🌟 URLパラメーターを取得するクラス
+  const urlStatus = searchParams.get('status'); // 🌟 ?status=xxx の部分を取り出す
+
+  // 🌟 URLが「official」なら本登録、それ以外（空っぽ含む）なら仮登録と判定する
+  const isOfficial = urlStatus === 'official';
+  const currentStatusText = isOfficial ? '本登録' : '仮登録';
+
   const [liffError, setLiffError] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
 
   const [slots, setSlots] = useState<Slot[]>([]);
   const [selectedSlotId, setSelectedSlotId] = useState<string>('');
 
-  // 🌟 追加した項目
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-
   const [lastName, setLastName] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastNameKana, setLastNameKana] = useState('');
@@ -36,7 +42,7 @@ export default function Home() {
   const [motivationLevel, setMotivationLevel] = useState('');
 
   const [loading, setLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false); // 🌟 連打防止用のフラグ
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleFacultyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setFaculty(e.target.value);
@@ -75,11 +81,8 @@ export default function Home() {
           if (r.slot_id) counts[r.slot_id] = (counts[r.slot_id] || 0) + 1;
         });
 
-        // 🌟 今の時間を取得
         const now = new Date();
-
         const formattedSlots = (slotsData || [])
-          // 🌟 過去の枠を除外するフィルター（現在時刻より未来の枠だけを残す）
           .filter((slot: any) => new Date(slot.start_time) > now)
           .map((slot: any) => ({
             ...slot,
@@ -102,7 +105,6 @@ export default function Home() {
       alert('予約する枠が選択されていません');
       return;
     }
-    // 🌟 メアドと電話番号も必須チェックに追加
     if (!lastName || !firstName || !lastNameKana || !firstNameKana || !email || !phone || !prefecture || !city || !faculty || !department) {
       alert('必須項目（*マーク）がすべて入力されているか確認してください');
       return;
@@ -110,11 +112,10 @@ export default function Home() {
 
     const targetSlot = slots.find(s => s.id === selectedSlotId);
     if (targetSlot && targetSlot.reservation_count !== undefined && targetSlot.reservation_count >= targetSlot.capacity) {
-      alert('申し訳ありません。タッチの差でこの枠は満席になってしまいました。別の時間をお選びください。');
+      alert('申し訳ありません。満席になってしまいました。別の時間をお選びください。');
       return;
     }
 
-    // 🌟 処理開始！ボタンをロックする
     setIsSubmitting(true);
 
     try {
@@ -129,8 +130,8 @@ export default function Home() {
             first_name: firstName,
             last_name_kana: lastNameKana,
             first_name_kana: firstNameKana,
-            email: email, // 🌟 追加
-            phone: phone, // 🌟 追加
+            email: email,
+            phone: phone,
             faculty: faculty,
             department: department,
             prefecture: prefecture,
@@ -138,6 +139,7 @@ export default function Home() {
             attendee_count: attendeeCount,
             admission_type: admissionType || null,
             motivation_level: motivationLevel || null,
+            status: currentStatusText, // 🌟 判定した「仮登録」または「本登録」の文字列をそのまま保存！
           },
         ]);
 
@@ -147,35 +149,42 @@ export default function Home() {
         ? new Date(targetSlot.start_time).toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
         : '';
 
-      const messageText = `【来場予約が確定しました】\n\n形式: ${targetSlot?.event_type || '対面'}\n日時: ${dateStr}~\nお名前: ${lastName} ${firstName} 様\n来場人数: ${attendeeCount} 名\n\nご登録のメールアドレス（${email}）宛てにも詳細をお送りする場合がございます。\nご来場を心よりお待ちしております！`;
+      // 🌟 LINEに届く通知メッセージも「仮」と「本」で文面を出し分け！
+      const messageText = isOfficial
+        ? `【来場予約（本登録）が確定しました】\n\n合格おめでとうございます！🎉\n新入生向けオリエンテーションの予約を受付いたしました。\n\n形式: ${targetSlot?.event_type || '対面'}\n日時: ${dateStr}~\nお名前: ${lastName} ${firstName} 様\n\n大学でお会いできるのを楽しみにしております！`
+        : `【研究室見学・相談会（仮登録）が確定しました】\n\n見学のご予約を承りました。\n\n形式: ${targetSlot?.event_type || '対面'}\n日時: ${dateStr}~\nお名前: ${lastName} ${firstName} 様\n\n当日のご来場を心よりお待ちしております！`;
 
       await liff.sendMessages([{ type: 'text', text: messageText }]);
       liff.closeWindow();
 
     } catch (err: any) {
       alert('エラーが発生しました: ' + err.message);
-      setIsSubmitting(false); // エラー時はボタンのロックを解除してやり直せるようにする
+      setIsSubmitting(false);
     }
   };
 
-  if (liffError) {
-    return <div className="p-4 text-red-500">LIFFエラー: {liffError}</div>;
-  }
-
-  // 🌟 ボタンが押せるかどうかの判定（入力漏れがないか）
   const isFormValid = selectedSlotId && lastName && firstName && lastNameKana && firstNameKana && email && phone && prefecture && city && faculty && department;
 
   return (
     <main className="min-h-screen bg-gray-50 pb-28 p-4 font-sans text-gray-800">
       <header className="mb-6 text-center">
-        <h1 className="text-xl font-bold text-green-600">来場予約システム</h1>
-        {displayName && (
-          <p className="mt-1 text-sm text-gray-600">こんにちは、{displayName} さん</p>
-        )}
+        {/* 🌟 画面のタイトルを自動で切り替える */}
+        <h1 className="text-xl font-bold text-green-600">
+          {isOfficial ? '【合格者対象】本登録フォーム' : '研究室見学 予約フォーム（仮登録）'}
+        </h1>
+        {/* 🌟 案内文も切り替える */}
+        <p className="text-xs text-gray-500 mt-2 bg-white p-2 rounded border border-gray-100 shadow-sm">
+          {isOfficial
+            ? '💡 合格が決定された方向けの、入学前オリエンテーション予約画面です。'
+            : '💡 合格発表前、または一般の見学相談を希望される方向けの予約画面です。'
+          }
+        </p>
       </header>
 
+      {/* --- 以降、入力項目などはそのまま維持（省略） --- */}
       <section className="mb-6 rounded-xl bg-white p-4 shadow-sm">
         <h2 className="mb-3 font-semibold text-gray-700">1. ご希望の日時を選択</h2>
+        {/* （カレンダー・スロット選択部分） */}
         {loading ? (
           <p className="text-sm text-gray-500 text-center py-4">予約枠を読み込み中...</p>
         ) : slots.length === 0 ? (
@@ -186,7 +195,6 @@ export default function Home() {
               const slotDate = new Date(slot.start_time);
               const dateStr = slotDate.toLocaleDateString('ja-JP', { weekday: 'short', month: 'short', day: 'numeric' });
               const timeStr = slotDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-
               const currentResCount = slot.reservation_count || 0;
               const isFull = currentResCount >= slot.capacity;
               const remaining = slot.capacity - currentResCount;
@@ -205,10 +213,7 @@ export default function Home() {
                 >
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded ${slot.event_type === 'オンライン'
-                        ? 'bg-purple-100 text-purple-700'
-                        : 'bg-blue-100 text-blue-700'
-                        }`}>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded ${slot.event_type === 'オンライン' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                         {slot.event_type}
                       </span>
                     </div>
@@ -218,11 +223,7 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="text-xs font-medium">
-                    {isFull ? (
-                      <span className="text-red-500 font-bold bg-red-50 px-2 py-1 rounded">満席</span>
-                    ) : (
-                      <span className="text-gray-500 bg-gray-50 px-2 py-1 rounded">残り {remaining} 枠</span>
-                    )}
+                    {isFull ? <span className="text-red-500 font-bold bg-red-50 px-2 py-1 rounded">満席</span> : <span className="text-gray-500 bg-gray-50 px-2 py-1 rounded">残り {remaining} 枠</span>}
                   </div>
                 </button>
               );
@@ -233,127 +234,82 @@ export default function Home() {
 
       <section className="mb-6 rounded-xl bg-white p-4 shadow-sm">
         <h2 className="mb-4 font-semibold text-gray-700 border-b pb-2">2. 来場者情報の入力</h2>
-
-        {/* お名前（姓・名） */}
         <div className="mb-4">
           <label className="block text-sm font-bold mb-1 text-gray-600">お名前 <span className="text-red-500">*</span></label>
           <div className="grid grid-cols-2 gap-2">
-            <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="山田" className="w-full p-2 border rounded-lg focus:outline-none focus:border-green-500" required />
-            <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="太郎" className="w-full p-2 border rounded-lg focus:outline-none focus:border-green-500" required />
+            <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="山田" className="w-full p-2 border rounded-lg" required />
+            <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="太郎" className="w-full p-2 border rounded-lg" required />
           </div>
         </div>
-
-        {/* フリガナ（せい・めい） */}
         <div className="mb-4">
           <label className="block text-sm font-bold mb-1 text-gray-600">ふりがな <span className="text-red-500">*</span></label>
           <div className="grid grid-cols-2 gap-2">
-            <input type="text" value={lastNameKana} onChange={(e) => setLastNameKana(e.target.value)} placeholder="やまだ" className="w-full p-2 border rounded-lg focus:outline-none focus:border-green-500" required />
-            <input type="text" value={firstNameKana} onChange={(e) => setFirstNameKana(e.target.value)} placeholder="たろう" className="w-full p-2 border rounded-lg focus:outline-none focus:border-green-500" required />
+            <input type="text" value={lastNameKana} onChange={(e) => setLastNameKana(e.target.value)} placeholder="やまだ" className="w-full p-2 border rounded-lg" required />
+            <input type="text" value={firstNameKana} onChange={(e) => setFirstNameKana(e.target.value)} placeholder="たろう" className="w-full p-2 border rounded-lg" required />
           </div>
         </div>
-
-        {/* 🌟 メールアドレス */}
         <div className="mb-4">
           <label className="block text-sm font-bold mb-1 text-gray-600">メールアドレス <span className="text-red-500">*</span></label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="example@yamanashi.ac.jp"
-            className="w-full p-2 border rounded-lg focus:outline-none focus:border-green-500"
-            required
-          />
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@yamanashi.ac.jp" className="w-full p-2 border rounded-lg" required />
         </div>
-
-        {/* 🌟 電話番号 */}
         <div className="mb-4">
           <label className="block text-sm font-bold mb-1 text-gray-600">電話番号 <span className="text-red-500">*</span></label>
-          <input
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="090-1234-5678"
-            className="w-full p-2 border rounded-lg focus:outline-none focus:border-green-500"
-            required
-          />
+          <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="090-1234-5678" className="w-full p-2 border rounded-lg" required />
         </div>
-
-        {/* 都道府県 */}
         <div className="mb-4">
           <label className="block text-sm font-bold mb-1 text-gray-600">お住まいの都道府県 <span className="text-red-500">*</span></label>
-          <select value={prefecture} onChange={(e) => setPrefecture(e.target.value)} className="w-full p-2 border rounded-lg bg-white focus:outline-none focus:border-green-500" required>
+          <select value={prefecture} onChange={(e) => setPrefecture(e.target.value)} className="w-full p-2 border rounded-lg bg-white" required>
             <option value="" disabled>選択してください</option>
             {PREFECTURES.map((pref) => <option key={pref} value={pref}>{pref}</option>)}
           </select>
         </div>
-
-        {/* 市区町村 */}
         <div className="mb-4">
           <label className="block text-sm font-bold mb-1 text-gray-600">市区町村 <span className="text-red-500">*</span></label>
-          <input type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder="甲府市武田" className="w-full p-2 border rounded-lg focus:outline-none focus:border-green-500" required />
+          <input type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder="甲府市武田" className="w-full p-2 border rounded-lg" required />
         </div>
-
-        {/* 来場予定人数 */}
         <div className="mb-4">
           <label className="block text-sm font-bold mb-1 text-gray-600">来場予定人数 <span className="text-red-500">*</span></label>
-          <select value={attendeeCount} onChange={(e) => setAttendeeCount(Number(e.target.value))} className="w-full p-2 border rounded-lg bg-white focus:outline-none focus:border-green-500" required>
+          <select value={attendeeCount} onChange={(e) => setAttendeeCount(Number(e.target.value))} className="w-full p-2 border rounded-lg bg-white" required>
             {[1, 2, 3, 4, 5].map((num) => <option key={num} value={num}>{num} 名</option>)}
           </select>
         </div>
-
-        {/* 学部 */}
         <div className="mb-4">
           <label className="block text-sm font-bold mb-1 text-gray-600">興味のある学部 <span className="text-red-500">*</span></label>
-          <select value={faculty} onChange={handleFacultyChange} className="w-full p-2 border rounded-lg bg-white focus:outline-none focus:border-green-500" required>
+          <select value={faculty} onChange={handleFacultyChange} className="w-full p-2 border rounded-lg bg-white" required>
             <option value="" disabled>選択してください</option>
             {FACULTIES.map((fac) => <option key={fac} value={fac}>{fac}</option>)}
           </select>
         </div>
-
-        {/* 学科（連動型） */}
         <div className="mb-4">
           <label className="block text-sm font-bold mb-1 text-gray-600">興味のある学科 <span className="text-red-500">*</span></label>
-          <select value={department} onChange={(e) => setDepartment(e.target.value)} className="w-full p-2 border rounded-lg bg-white focus:outline-none focus:border-green-500" required disabled={!faculty}>
+          <select value={department} onChange={(e) => setDepartment(e.target.value)} className="w-full p-2 border rounded-lg bg-white" required disabled={!faculty}>
             <option value="" disabled>{faculty ? "選択してください" : "先に学部を選択してください"}</option>
             {faculty && FACULTY_DEPARTMENT_MAP[faculty].map((dep) => <option key={dep} value={dep}>{dep}</option>)}
           </select>
         </div>
-
-        {/* 入試区分 */}
         <div className="mb-4">
           <label className="block text-sm font-bold mb-1 text-gray-600">検討中の入試区分</label>
-          <select value={admissionType} onChange={(e) => setAdmissionType(e.target.value)} className="w-full p-2 border rounded-lg bg-white focus:outline-none focus:border-green-500">
+          <select value={admissionType} onChange={(e) => setAdmissionType(e.target.value)} className="w-full p-2 border rounded-lg bg-white">
             <option value="">選択肢にない・未定</option>
             {ADMISSION_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
           </select>
         </div>
-
-        {/* 志望度 */}
         <div className="mb-2">
           <label className="block text-sm font-bold mb-1 text-gray-600">現在の志望度</label>
-          <select value={motivationLevel} onChange={(e) => setMotivationLevel(e.target.value)} className="w-full p-2 border rounded-lg bg-white focus:outline-none focus:border-green-500">
+          <select value={motivationLevel} onChange={(e) => setMotivationLevel(e.target.value)} className="w-full p-2 border rounded-lg bg-white">
             <option value="">選択肢にない・未定</option>
             {MOTIVATION_LEVELS.map((level) => <option key={level} value={level}>{level}</option>)}
           </select>
         </div>
       </section>
 
-      {/* 固定の予約確定ボタンエリア */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-lg z-50">
         <button
           disabled={!isFormValid || isSubmitting}
           onClick={handleReserve}
-          className={`w-full rounded-xl py-4 text-center font-bold text-white transition-all ${isFormValid && !isSubmitting
-              ? 'bg-green-600 hover:bg-green-700 active:scale-95 shadow-md'
-              : 'bg-gray-300 cursor-not-allowed'
-            }`}
+          className={`w-full rounded-xl py-4 text-center font-bold text-white transition-all ${isFormValid && !isSubmitting ? 'bg-green-600 hover:bg-green-700 active:scale-95 shadow-md' : 'bg-gray-300 cursor-not-allowed'}`}
         >
-          {isSubmitting
-            ? '予約を送信中...'
-            : isFormValid
-              ? 'この内容で予約を確定する'
-              : '日時と必要事項を入力してください'
-          }
+          {isSubmitting ? '予約を送信中...' : isFormValid ? `この内容で${currentStatusText}を確定する` : '日時と必要事項を入力してください'}
         </button>
       </div>
       <div className="h-24"></div>
