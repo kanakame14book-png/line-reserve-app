@@ -32,11 +32,11 @@ function CheckinContent() {
                 .eq('id', id)
                 .maybeSingle();
 
-            // if (fetchError || !resData) {
-            //     setCheckinStatus('error');
-            //     setLoading(false);
-            //     return;
-            // }
+            if (fetchError || !resData) {
+                setCheckinStatus('error');
+                setLoading(false);
+                return;
+            }
 
             setStudentInfo(resData);
 
