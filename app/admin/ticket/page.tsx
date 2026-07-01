@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 
 function TicketContent() {
     const searchParams = useSearchParams();
-    const resId = searchParams.get('id'); // URLから予約IDを取得
+    const resId = searchParams.get('id'); // URLから予約IDを取得します
 
     const [reservation, setReservation] = useState<any>(null);
     const [slot, setSlot] = useState<any>(null);
