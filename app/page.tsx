@@ -60,6 +60,10 @@ function HomeContent() {
       setFaculty(data.faculty || '');
       setDepartment(data.department || '');
       setSelectedSlotId(data.slot_id || '');
+      // 🌟 再送信時に来場人数・入試区分・志望度が初期値へ上書きされないよう復元する
+      setAttendeeCount(data.attendee_count || 1);
+      setAdmissionType(data.admission_type || '');
+      setMotivationLevel(data.motivation_level || '');
     } else {
       setExistingReservation(null);
     }
@@ -361,7 +365,7 @@ function HomeContent() {
           <label className="block text-sm font-bold mb-1 text-gray-600">興味のある学科 <span className="text-red-500">*</span></label>
           <select value={department} onChange={(e) => setDepartment(e.target.value)} className="w-full p-2 border rounded-lg bg-white" required disabled={!faculty}>
             <option value="" disabled>{faculty ? "選択してください" : "先に学部を選択してください"}</option>
-            {faculty && FACULTY_DEPARTMENT_MAP[faculty].map((dep) => <option key={dep} value={dep}>{dep}</option>)}
+            {faculty && (FACULTY_DEPARTMENT_MAP[faculty] ?? []).map((dep) => <option key={dep} value={dep}>{dep}</option>)}
           </select>
         </div>
         <div className="mb-4">
