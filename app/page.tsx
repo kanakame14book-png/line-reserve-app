@@ -60,6 +60,10 @@ function HomeContent() {
       setFaculty(data.faculty || '');
       setDepartment(data.department || '');
       setSelectedSlotId(data.slot_id || '');
+      // 🌟 再送信時に来場人数・入試区分・志望度が初期値へ上書きされないよう復元する
+      setAttendeeCount(data.attendee_count || 1);
+      setAdmissionType(data.admission_type || '');
+      setMotivationLevel(data.motivation_level || '');
     } else {
       setExistingReservation(null);
     }
