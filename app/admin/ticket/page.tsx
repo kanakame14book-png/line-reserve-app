@@ -54,7 +54,7 @@ function TicketContent() {
     if (!reservation) return <div className="p-8 text-center text-red-500 font-bold">⚠️ 該当する予約データが見つかりません。</div>;
 
     // 🌟 より高速で安定したQRコード生成APIに変更（サイズも200x200にアップ）
-    const qrValue = encodeURIComponent(`https://line-reserve-app.vercel.app/admin/checkin?id=${reservation.id}`);
+    const qrValue = encodeURIComponent(`${window.location.origin}/admin/checkin?id=${reservation.id}`);
     const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${qrValue}`;
 
     const isOfficial = reservation.status === '本登録';
