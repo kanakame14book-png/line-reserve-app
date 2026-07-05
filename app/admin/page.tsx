@@ -17,7 +17,6 @@ const generateTimeOptions = () => {
 };
 const TIME_OPTIONS = generateTimeOptions();
 
-// 🌟 attendee_count を追加
 interface Reservation {
     id: string;
     created_at: string;
@@ -38,7 +37,6 @@ interface Reservation {
 function AdminContent() {
     const [session, setSession] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    // 🌟 タブに reception (受付表) を追加
     const [activeTab, setActiveTab] = useState<'users' | 'slots' | 'reception'>('users');
 
     const [loginEmail, setLoginEmail] = useState('');
@@ -48,12 +46,10 @@ function AdminContent() {
 
     const [reservations, setReservations] = useState<Reservation[]>([]);
 
-    // 登録者一覧用のフィルター
     const [filterSlotId, setFilterSlotId] = useState<string>('all');
     const [filterStatus, setFilterStatus] = useState<string>('all');
     const [filterFaculty, setFilterFaculty] = useState<string>('all');
 
-    // 🌟 受付表タブ用のフィルター（表示する枠）
     const [receptionSlotId, setReceptionSlotId] = useState<string>('all');
 
     const [slots, setSlots] = useState<Slot[]>([]);
@@ -214,8 +210,6 @@ function AdminContent() {
         return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     };
 
-    // --- 各種データ処理系ハンドラー ---
-
     const handleAssignGroups = async (slotId: string) => {
         if (!confirm('この枠の本登録者を学部ごとに【A班・B班・C班】の3班に自動で振り分けます。\nよろしいですか？')) return;
 
@@ -264,32 +258,38 @@ function AdminContent() {
         }
     };
 
-    // 🌟 班の手動編集ハンドラー（フォーカスが外れた時に自動保存）
     const handleUpdateGroup = async (id: string, newGroup: string) => {
         try {
             const { error } = await supabase.from('reservations').update({ group_name: newGroup }).eq('id', id);
             if (error) throw error;
-            // ローカルのStateも更新して画面に即座に反映させる
             setReservations(prev => prev.map(res => res.id === id ? { ...res, group_name: newGroup } : res));
         } catch (err: any) {
             alert('班の更新に失敗しました: ' + err.message);
         }
     };
 
-    // 🌟 手動受付ハンドラー（「本登録」⇄「受付済」をボタンで切り替え）
+    // 🌟 人数の手動編集ハンドラー（選択されたら自動保存）
+    const handleUpdateAttendeeCount = async (id: string, newCount: number) => {
+        try {
+            const { error } = await supabase.from('reservations').update({ attendee_count: newCount }).eq('id', id);
+            if (error) throw error;
+            setReservations(prev => prev.map(res => res.id === id ? { ...res, attendee_count: newCount } : res));
+        } catch (err: any) {
+            alert('人数の更新に失敗しました: ' + err.message);
+        }
+    };
+
     const handleToggleCheckin = async (id: string, currentStatus: string) => {
         const newStatus = currentStatus === '受付済' ? '本登録' : '受付済';
         try {
             const { error } = await supabase.from('reservations').update({ status: newStatus }).eq('id', id);
             if (error) throw error;
-            // ローカルのStateも更新して画面に即座に反映させる
             setReservations(prev => prev.map(res => res.id === id ? { ...res, status: newStatus } : res));
         } catch (err: any) {
             alert('ステータスの更新に失敗しました: ' + err.message);
         }
     };
 
-    // 登録者一覧用フィルター
     const filteredReservations = reservations.filter(res => {
         const matchSlot = filterSlotId === 'all' || (filterSlotId === 'none' ? !res.slot_id : res.slot_id === filterSlotId);
         const matchStatus = filterStatus === 'all' || res.status === filterStatus;
@@ -297,7 +297,6 @@ function AdminContent() {
         return matchSlot && matchStatus && matchFaculty;
     });
 
-    // 🌟 受付表（当日用）フィルター：本登録と受付済の人のみ、かつ選択した日程で絞り込む
     const receptionReservations = reservations.filter(res => {
         const isOfficialMember = res.status === '本登録' || res.status === '受付済';
         const matchSlot = receptionSlotId === 'all' || res.slot_id === receptionSlotId;
@@ -351,13 +350,11 @@ function AdminContent() {
                 <button onClick={() => setActiveTab('slots')} className={`whitespace-nowrap px-4 py-2.5 font-bold text-sm transition-all border-b-2 ${activeTab === 'slots' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
                     📅 予約枠の設定
                 </button>
-                {/* 🌟 追加：受付表（当日用）タブ */}
                 <button onClick={() => setActiveTab('reception')} className={`whitespace-nowrap px-4 py-2.5 font-bold text-sm transition-all border-b-2 ${activeTab === 'reception' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
                     📋 受付表（当日用）
                 </button>
             </div>
 
-            {/* 🌟 1. 登録者一覧タブ（全体管理） */}
             {activeTab === 'users' && (
                 <section className="bg-white rounded-xl shadow-sm overflow-hidden">
                     <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -396,6 +393,7 @@ function AdminContent() {
                                 <tr className="bg-gray-100 text-gray-600 text-xs uppercase font-semibold border-b border-gray-200">
                                     <th className="p-3">区分</th>
                                     <th className="p-3">班</th>
+                                    <th className="p-3 text-center">人数</th>
                                     <th className="p-3">予約日時</th>
                                     <th className="p-3">氏名</th>
                                     <th className="p-3">志望学部・学科</th>
@@ -406,7 +404,7 @@ function AdminContent() {
                             </thead>
                             <tbody className="divide-y divide-gray-100 text-sm">
                                 {filteredReservations.length === 0 ? (
-                                    <tr><td colSpan={8} className="p-8 text-center text-gray-400">条件に一致するデータがありません。</td></tr>
+                                    <tr><td colSpan={9} className="p-8 text-center text-gray-400">条件に一致するデータがありません。</td></tr>
                                 ) : (
                                     filteredReservations.map((res) => (
                                         <tr key={res.id} className="hover:bg-gray-50 transition-colors">
@@ -418,6 +416,7 @@ function AdminContent() {
                                                 </span>
                                             </td>
                                             <td className="p-3 font-bold text-gray-700">{res.group_name || '-'}</td>
+                                            <td className="p-3 text-center text-gray-700">{res.attendee_count} 名</td>
                                             <td className="p-3 font-medium text-blue-900">{formatSlotTime(res.slot_id)}</td>
                                             <td className="p-3 font-medium text-gray-900">{res.last_name ? `${res.last_name} ${res.first_name}` : '（未入力）'}</td>
                                             <td className="p-3">
@@ -444,7 +443,6 @@ function AdminContent() {
                 </section>
             )}
 
-            {/* 🌟 2. 受付表（当日用）タブ */}
             {activeTab === 'reception' && (
                 <section className="bg-white rounded-xl shadow-sm overflow-hidden">
                     <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -472,7 +470,7 @@ function AdminContent() {
                                     <th className="p-3 w-32">班 (クリックで編集)</th>
                                     <th className="p-3">氏名</th>
                                     <th className="p-3">学部・学科</th>
-                                    <th className="p-3 text-center w-24">人数</th>
+                                    <th className="p-3 text-center w-28">人数 (変更可)</th>
                                     <th className="p-3 text-center w-32">手動受付</th>
                                 </tr>
                             </thead>
@@ -488,7 +486,6 @@ function AdminContent() {
                                                 </span>
                                             </td>
                                             <td className="p-3">
-                                                {/* 🌟 班を自由にテキスト入力で編集可能に（フォーカスが外れたら保存） */}
                                                 <input
                                                     type="text"
                                                     defaultValue={res.group_name || ''}
@@ -506,9 +503,20 @@ function AdminContent() {
                                                 <div className="text-gray-900 font-bold">{res.faculty}</div>
                                                 <div className="text-xs text-gray-500">{res.department}</div>
                                             </td>
-                                            <td className="p-3 text-center font-bold text-gray-700">{res.attendee_count} 名</td>
+                                            <td className="p-3 text-center font-bold text-gray-700 whitespace-nowrap">
+                                                {/* 🌟 人数をプルダウンで直接変更できるようにしました */}
+                                                <select
+                                                    value={res.attendee_count}
+                                                    onChange={(e) => handleUpdateAttendeeCount(res.id, Number(e.target.value))}
+                                                    className="w-12 p-1 bg-transparent hover:bg-white border border-transparent hover:border-gray-300 rounded outline-none cursor-pointer text-center mr-1 transition-all"
+                                                >
+                                                    {[1, 2, 3, 4, 5, 6, 7].map(num => (
+                                                        <option key={num} value={num}>{num}</option>
+                                                    ))}
+                                                </select>
+                                                名
+                                            </td>
                                             <td className="p-3 text-center">
-                                                {/* 🌟 手動受付トグルボタン */}
                                                 <button
                                                     onClick={() => handleToggleCheckin(res.id, res.status)}
                                                     className={`w-full font-bold text-xs px-3 py-2 rounded transition-all shadow-sm ${res.status === '受付済' ? 'bg-gray-200 text-gray-600 hover:bg-gray-300' : 'bg-green-600 text-white hover:bg-green-700'
@@ -526,7 +534,6 @@ function AdminContent() {
                 </section>
             )}
 
-            {/* 🌟 3. 予約枠の設定タブ */}
             {activeTab === 'slots' && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     <div className={`md:col-span-1 bg-white p-6 rounded-xl shadow-sm h-fit border transition-colors ${editingSlotId ? 'border-amber-400 ring-2 ring-amber-400/10' : 'border-transparent'}`}>
