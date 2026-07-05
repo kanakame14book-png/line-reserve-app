@@ -22,7 +22,6 @@ interface Reservation {
     created_at: string;
     last_name: string;
     first_name: string;
-    // 🌟 ふりがな用のデータを読み取れるように追加
     last_name_kana: string;
     first_name_kana: string;
     email: string;
@@ -64,6 +63,9 @@ function AdminContent() {
 
     const [isAssigning, setIsAssigning] = useState(false);
 
+    // 🌟 ソート（並び替え）用のState
+    const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>({ key: 'created_at', direction: 'desc' });
+
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
@@ -94,8 +96,7 @@ function AdminContent() {
         try {
             const { data, error } = await supabase
                 .from('reservations')
-                .select('*')
-                .order('created_at', { ascending: false });
+                .select('*');
             if (error) throw error;
             setReservations(data || []);
         } catch (err: any) {
@@ -292,6 +293,44 @@ function AdminContent() {
         }
     };
 
+    // 🌟 並び替え（ソート）をリクエストする関数
+    const requestSort = (key: string) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    // 🌟 与えられた配列をソート設定に基づいて並び替える関数
+    const sortReservations = (resList: Reservation[]) => {
+        if (!sortConfig) return resList;
+        return [...resList].sort((a: any, b: any) => {
+            let aValue = a[sortConfig.key];
+            let bValue = b[sortConfig.key];
+
+            // 日時の場合は Date で比較
+            if (sortConfig.key === 'slot_id') {
+                const slotA = slots.find(s => s.id === a.slot_id);
+                const slotB = slots.find(s => s.id === b.slot_id);
+                aValue = slotA ? new Date(slotA.start_time).getTime() : 0;
+                bValue = slotB ? new Date(slotB.start_time).getTime() : 0;
+            }
+            // 氏名の場合はふりがなを優先して比較
+            else if (sortConfig.key === 'name') {
+                aValue = a.last_name_kana || a.last_name || '';
+                bValue = b.last_name_kana || b.last_name || '';
+            }
+
+            if (aValue === null || aValue === undefined) aValue = '';
+            if (bValue === null || bValue === undefined) bValue = '';
+
+            if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+    };
+
     const filteredReservations = reservations.filter(res => {
         const matchSlot = filterSlotId === 'all' || (filterSlotId === 'none' ? !res.slot_id : res.slot_id === filterSlotId);
         const matchStatus = filterStatus === 'all' || res.status === filterStatus;
@@ -304,6 +343,25 @@ function AdminContent() {
         const matchSlot = receptionSlotId === 'all' || res.slot_id === receptionSlotId;
         return isOfficialMember && matchSlot;
     });
+
+    // フィルターした結果をさらにソートする
+    const sortedFilteredReservations = sortReservations(filteredReservations);
+    const sortedReceptionReservations = sortReservations(receptionReservations);
+
+    // 🌟 ソート可能なテーブル見出し（TH）を作るための共通パーツ
+    const SortableHeader = ({ label, sortKey, className = "p-3" }: { label: string, sortKey: string, className?: string }) => {
+        const isActive = sortConfig?.key === sortKey;
+        return (
+            <th className={`${className} cursor-pointer hover:bg-black/5 select-none transition-colors group relative`} onClick={() => requestSort(sortKey)}>
+                <div className="flex items-center gap-1">
+                    {label}
+                    <span className={`text-[10px] ${isActive ? 'text-blue-600' : 'text-gray-300 opacity-0 group-hover:opacity-100'}`}>
+                        {isActive ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '▲▼'}
+                    </span>
+                </div>
+            </th>
+        );
+    };
 
     if (loading && !session) {
         return <div className="p-8 text-center text-gray-500">システム起動中...</div>;
@@ -362,7 +420,7 @@ function AdminContent() {
                 <section className="bg-white rounded-xl shadow-sm overflow-hidden">
                     <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <h2 className="font-semibold text-gray-700 whitespace-nowrap">
-                            登録者一覧 <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs ml-1">{filteredReservations.length}名</span>
+                            登録者一覧 <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs ml-1">{sortedFilteredReservations.length}名</span>
                         </h2>
 
                         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
@@ -394,22 +452,23 @@ function AdminContent() {
                         <table className="w-full text-left border-collapse min-w-[800px]">
                             <thead>
                                 <tr className="bg-gray-100 text-gray-600 text-xs uppercase font-semibold border-b border-gray-200">
-                                    <th className="p-3">区分</th>
-                                    <th className="p-3">班</th>
-                                    <th className="p-3 text-center">人数</th>
-                                    <th className="p-3">予約日時</th>
-                                    <th className="p-3">氏名</th>
-                                    <th className="p-3">志望学部・学科</th>
-                                    <th className="p-3">都道府県</th>
-                                    <th className="p-3">メールアドレス</th>
+                                    {/* 🌟 ソート対応の見出しに変更 */}
+                                    <SortableHeader label="区分" sortKey="status" />
+                                    <SortableHeader label="班" sortKey="group_name" />
+                                    <SortableHeader label="人数" sortKey="attendee_count" className="p-3 text-center" />
+                                    <SortableHeader label="予約日時" sortKey="slot_id" />
+                                    <SortableHeader label="氏名" sortKey="name" />
+                                    <SortableHeader label="志望学部・学科" sortKey="faculty" />
+                                    <SortableHeader label="都道府県" sortKey="prefecture" />
+                                    <SortableHeader label="登録日時" sortKey="created_at" />
                                     <th className="p-3 text-center">アクション</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 text-sm">
-                                {filteredReservations.length === 0 ? (
+                                {sortedFilteredReservations.length === 0 ? (
                                     <tr><td colSpan={9} className="p-8 text-center text-gray-400">条件に一致するデータがありません。</td></tr>
                                 ) : (
-                                    filteredReservations.map((res) => (
+                                    sortedFilteredReservations.map((res) => (
                                         <tr key={res.id} className="hover:bg-gray-50 transition-colors">
                                             <td className="p-3">
                                                 <span className={`px-2 py-1 rounded-md text-xs font-bold ${res.status === '受付済' ? 'bg-green-100 text-green-700' :
@@ -421,8 +480,6 @@ function AdminContent() {
                                             <td className="p-3 font-bold text-gray-700">{res.group_name || '-'}</td>
                                             <td className="p-3 text-center text-gray-700">{res.attendee_count} 名</td>
                                             <td className="p-3 font-medium text-blue-900">{formatSlotTime(res.slot_id)}</td>
-
-                                            {/* 🌟 氏名の下にふりがなを表示 */}
                                             <td className="p-3">
                                                 <div className="font-medium text-gray-900">
                                                     {res.last_name ? `${res.last_name} ${res.first_name}` : '（未入力）'}
@@ -433,13 +490,12 @@ function AdminContent() {
                                                     </div>
                                                 )}
                                             </td>
-
                                             <td className="p-3">
                                                 <div className="text-gray-900">{res.faculty}</div>
                                                 <div className="text-xs text-gray-500">{res.department}</div>
                                             </td>
                                             <td className="p-3 text-gray-600">{res.prefecture}</td>
-                                            <td className="p-3 text-gray-600">{res.email}</td>
+                                            <td className="p-3 text-xs text-gray-400">{new Date(res.created_at).toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
                                             <td className="p-3 text-center">
                                                 <button
                                                     onClick={() => window.open(`/admin/ticket?id=${res.id}`, '_blank')}
@@ -463,7 +519,7 @@ function AdminContent() {
                 <section className="bg-white rounded-xl shadow-sm overflow-hidden">
                     <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <h2 className="font-semibold text-gray-700 whitespace-nowrap">
-                            📋 当日受付表 <span className="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full text-xs ml-1">{receptionReservations.length}名</span>
+                            📋 当日受付表 <span className="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full text-xs ml-1">{sortedReceptionReservations.length}名</span>
                         </h2>
 
                         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
@@ -482,19 +538,22 @@ function AdminContent() {
                         <table className="w-full text-left border-collapse min-w-[700px]">
                             <thead>
                                 <tr className="bg-indigo-50 text-indigo-800 text-xs uppercase font-semibold border-b border-indigo-100">
-                                    <th className="p-3 w-28">状態</th>
-                                    <th className="p-3 w-32">班 (クリックで編集)</th>
-                                    <th className="p-3">氏名</th>
-                                    <th className="p-3">学部・学科</th>
-                                    <th className="p-3 text-center w-28">人数 (変更可)</th>
+                                    {/* 🌟 ソート対応の見出しに変更 */}
+                                    <SortableHeader label="状態" sortKey="status" className="p-3 w-28" />
+                                    <SortableHeader label="班" sortKey="group_name" className="p-3 w-32" />
+                                    <SortableHeader label="氏名" sortKey="name" className="p-3" />
+                                    <SortableHeader label="学部・学科" sortKey="faculty" className="p-3" />
+                                    {/* 🌟 都道府県をここに追加！ */}
+                                    <SortableHeader label="都道府県" sortKey="prefecture" className="p-3 w-24" />
+                                    <SortableHeader label="人数" sortKey="attendee_count" className="p-3 text-center w-28" />
                                     <th className="p-3 text-center w-32">手動受付</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 text-sm">
-                                {receptionReservations.length === 0 ? (
-                                    <tr><td colSpan={6} className="p-8 text-center text-gray-400">表示するデータがありません。</td></tr>
+                                {sortedReceptionReservations.length === 0 ? (
+                                    <tr><td colSpan={7} className="p-8 text-center text-gray-400">表示するデータがありません。</td></tr>
                                 ) : (
-                                    receptionReservations.map((res) => (
+                                    sortedReceptionReservations.map((res) => (
                                         <tr key={res.id} className={`transition-colors ${res.status === '受付済' ? 'bg-gray-50' : 'hover:bg-blue-50'}`}>
                                             <td className="p-3">
                                                 <span className={`px-2 py-1 rounded-md text-xs font-bold ${res.status === '受付済' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
@@ -514,8 +573,6 @@ function AdminContent() {
                                                     className="w-full p-1.5 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded bg-transparent focus:bg-white transition-all text-sm font-bold text-gray-700 outline-none"
                                                 />
                                             </td>
-
-                                            {/* 🌟 氏名の下にふりがなを表示 */}
                                             <td className="p-3">
                                                 <div className="font-medium text-gray-900">
                                                     {res.last_name ? `${res.last_name} ${res.first_name}` : '（未入力）'}
@@ -526,10 +583,13 @@ function AdminContent() {
                                                     </div>
                                                 )}
                                             </td>
-
                                             <td className="p-3">
                                                 <div className="text-gray-900 font-bold">{res.faculty}</div>
                                                 <div className="text-xs text-gray-500">{res.department}</div>
+                                            </td>
+                                            {/* 🌟 都道府県データの表示 */}
+                                            <td className="p-3 text-gray-700 font-medium">
+                                                {res.prefecture}
                                             </td>
                                             <td className="p-3 text-center font-bold text-gray-700 whitespace-nowrap">
                                                 <select
