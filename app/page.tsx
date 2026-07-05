@@ -355,9 +355,13 @@ function HomeContent() {
         </section>
       )}
 
-      {/* 1. 志望情報（必須） */}
+      {/* 🌟 1. 志望情報 / 入学先情報（必須） */}
       <section className="mb-6 rounded-xl bg-white p-4 shadow-sm border-l-4 border-blue-500">
-        <h2 className="mb-4 font-semibold text-gray-700 border-b pb-2">1. 志望情報（必須）</h2>
+        <h2 className="mb-4 font-semibold text-gray-700 border-b pb-2">
+          {/* 本登録時は「入学予定の情報」、仮登録時は「志望情報」に切り替え */}
+          {isOfficial ? '1. 入学予定の情報（必須）' : '1. 志望情報（必須）'}
+        </h2>
+
         <div className="mb-4">
           <label className="block text-sm font-bold mb-1 text-gray-600">学部 <span className="text-red-500">*</span></label>
           <select value={faculty} onChange={handleFacultyChange} className="w-full p-2 border rounded-lg bg-white" required>
@@ -365,16 +369,19 @@ function HomeContent() {
             {FACULTIES.map((fac) => <option key={fac} value={fac}>{fac}</option>)}
           </select>
         </div>
+
         <div className="mb-4">
-          <label className="block text-sm font-bold mb-1 text-gray-600">学科 <span className="text-red-500">*</span></label>
+          <label className="block text-sm font-bold mb-1 text-gray-600">学科・コース <span className="text-red-500">*</span></label>
           <select value={department} onChange={handleDepartmentChange} className="w-full p-2 border rounded-lg bg-white" required disabled={!faculty}>
             <option value="" disabled>{faculty ? "選択してください" : "先に学部を選択してください"}</option>
             {faculty && (FACULTY_DEPARTMENT_MAP[faculty] ?? []).map((dep) => <option key={dep} value={dep}>{dep}</option>)}
           </select>
         </div>
+
         <div className="mb-2">
           <label className="block text-sm font-bold mb-1 text-gray-600">
-            受験（予定）の入試区分 <span className="text-red-500">*</span>
+            {/* 本登録時は「合格した」、仮登録時は「受験（予定）の」に切り替え */}
+            {isOfficial ? '合格した入試区分' : '受験（予定）の入試区分'} <span className="text-red-500">*</span>
           </label>
           <select
             value={admissionType}
