@@ -234,7 +234,7 @@ function AdminContent() {
                 byFaculty[user.faculty].push(user);
             });
 
-            const updates = [];
+            const updates: any[] = [];
             const groupNames = ['A班', 'B班', 'C班'];
 
             for (const fac in byFaculty) {
