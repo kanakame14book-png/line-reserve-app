@@ -17,6 +17,7 @@ const generateTimeOptions = () => {
 };
 const TIME_OPTIONS = generateTimeOptions();
 
+// 🌟 attendee_count を追加
 interface Reservation {
     id: string;
     created_at: string;
@@ -31,12 +32,14 @@ interface Reservation {
     status: string;
     slot_id: string;
     group_name?: string;
+    attendee_count: number;
 }
 
 function AdminContent() {
     const [session, setSession] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'users' | 'slots'>('users');
+    // 🌟 タブに reception (受付表) を追加
+    const [activeTab, setActiveTab] = useState<'users' | 'slots' | 'reception'>('users');
 
     const [loginEmail, setLoginEmail] = useState('');
     const [loginPassword, setLoginPassword] = useState('');
@@ -45,9 +48,13 @@ function AdminContent() {
 
     const [reservations, setReservations] = useState<Reservation[]>([]);
 
+    // 登録者一覧用のフィルター
     const [filterSlotId, setFilterSlotId] = useState<string>('all');
     const [filterStatus, setFilterStatus] = useState<string>('all');
     const [filterFaculty, setFilterFaculty] = useState<string>('all');
+
+    // 🌟 受付表タブ用のフィルター（表示する枠）
+    const [receptionSlotId, setReceptionSlotId] = useState<string>('all');
 
     const [slots, setSlots] = useState<Slot[]>([]);
     const [newDate, setNewDate] = useState('');
@@ -207,23 +214,17 @@ function AdminContent() {
         return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     };
 
-    const filteredReservations = reservations.filter(res => {
-        const matchSlot = filterSlotId === 'all' || (filterSlotId === 'none' ? !res.slot_id : res.slot_id === filterSlotId);
-        const matchStatus = filterStatus === 'all' || res.status === filterStatus;
-        const matchFaculty = filterFaculty === 'all' || res.faculty === filterFaculty;
-        return matchSlot && matchStatus && matchFaculty;
-    });
+    // --- 各種データ処理系ハンドラー ---
 
-    // 締め切り後に管理者が手動で班分けを実行する関数
     const handleAssignGroups = async (slotId: string) => {
         if (!confirm('この枠の本登録者を学部ごとに【A班・B班・C班】の3班に自動で振り分けます。\nよろしいですか？')) return;
 
         setIsAssigning(true);
         try {
-            const targetUsers = reservations.filter(res => res.slot_id === slotId && res.status === '本登録');
+            const targetUsers = reservations.filter(res => res.slot_id === slotId && (res.status === '本登録' || res.status === '受付済'));
 
             if (targetUsers.length === 0) {
-                alert('この枠には本登録の対象者がいません。');
+                alert('この枠には対象者がいません。');
                 setIsAssigning(false);
                 return;
             }
@@ -253,7 +254,7 @@ function AdminContent() {
             }
 
             await Promise.all(updates);
-            alert('班分けが完了しました！登録者一覧から確認できます。');
+            alert('班分けが完了しました！');
             fetchReservations();
 
         } catch (error: any) {
@@ -262,6 +263,46 @@ function AdminContent() {
             setIsAssigning(false);
         }
     };
+
+    // 🌟 班の手動編集ハンドラー（フォーカスが外れた時に自動保存）
+    const handleUpdateGroup = async (id: string, newGroup: string) => {
+        try {
+            const { error } = await supabase.from('reservations').update({ group_name: newGroup }).eq('id', id);
+            if (error) throw error;
+            // ローカルのStateも更新して画面に即座に反映させる
+            setReservations(prev => prev.map(res => res.id === id ? { ...res, group_name: newGroup } : res));
+        } catch (err: any) {
+            alert('班の更新に失敗しました: ' + err.message);
+        }
+    };
+
+    // 🌟 手動受付ハンドラー（「本登録」⇄「受付済」をボタンで切り替え）
+    const handleToggleCheckin = async (id: string, currentStatus: string) => {
+        const newStatus = currentStatus === '受付済' ? '本登録' : '受付済';
+        try {
+            const { error } = await supabase.from('reservations').update({ status: newStatus }).eq('id', id);
+            if (error) throw error;
+            // ローカルのStateも更新して画面に即座に反映させる
+            setReservations(prev => prev.map(res => res.id === id ? { ...res, status: newStatus } : res));
+        } catch (err: any) {
+            alert('ステータスの更新に失敗しました: ' + err.message);
+        }
+    };
+
+    // 登録者一覧用フィルター
+    const filteredReservations = reservations.filter(res => {
+        const matchSlot = filterSlotId === 'all' || (filterSlotId === 'none' ? !res.slot_id : res.slot_id === filterSlotId);
+        const matchStatus = filterStatus === 'all' || res.status === filterStatus;
+        const matchFaculty = filterFaculty === 'all' || res.faculty === filterFaculty;
+        return matchSlot && matchStatus && matchFaculty;
+    });
+
+    // 🌟 受付表（当日用）フィルター：本登録と受付済の人のみ、かつ選択した日程で絞り込む
+    const receptionReservations = reservations.filter(res => {
+        const isOfficialMember = res.status === '本登録' || res.status === '受付済';
+        const matchSlot = receptionSlotId === 'all' || res.slot_id === receptionSlotId;
+        return isOfficialMember && matchSlot;
+    });
 
     if (loading && !session) {
         return <div className="p-8 text-center text-gray-500">システム起動中...</div>;
@@ -303,15 +344,20 @@ function AdminContent() {
                 </button>
             </header>
 
-            <div className="flex border-b border-gray-200 mb-6 gap-2">
-                <button onClick={() => setActiveTab('users')} className={`px-4 py-2.5 font-bold text-sm transition-all border-b-2 ${activeTab === 'users' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+            <div className="flex border-b border-gray-200 mb-6 gap-2 overflow-x-auto">
+                <button onClick={() => setActiveTab('users')} className={`whitespace-nowrap px-4 py-2.5 font-bold text-sm transition-all border-b-2 ${activeTab === 'users' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
                     👤 登録者一覧
                 </button>
-                <button onClick={() => setActiveTab('slots')} className={`px-4 py-2.5 font-bold text-sm transition-all border-b-2 ${activeTab === 'slots' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                <button onClick={() => setActiveTab('slots')} className={`whitespace-nowrap px-4 py-2.5 font-bold text-sm transition-all border-b-2 ${activeTab === 'slots' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
                     📅 予約枠の設定
+                </button>
+                {/* 🌟 追加：受付表（当日用）タブ */}
+                <button onClick={() => setActiveTab('reception')} className={`whitespace-nowrap px-4 py-2.5 font-bold text-sm transition-all border-b-2 ${activeTab === 'reception' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                    📋 受付表（当日用）
                 </button>
             </div>
 
+            {/* 🌟 1. 登録者一覧タブ（全体管理） */}
             {activeTab === 'users' && (
                 <section className="bg-white rounded-xl shadow-sm overflow-hidden">
                     <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -323,6 +369,7 @@ function AdminContent() {
                             <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="text-sm border rounded p-1.5 bg-white text-gray-600 outline-none">
                                 <option value="all">すべての状態</option>
                                 <option value="本登録">本登録のみ</option>
+                                <option value="受付済">受付済のみ</option>
                                 <option value="仮登録">仮登録のみ</option>
                             </select>
 
@@ -363,7 +410,13 @@ function AdminContent() {
                                 ) : (
                                     filteredReservations.map((res) => (
                                         <tr key={res.id} className="hover:bg-gray-50 transition-colors">
-                                            <td className="p-3"><span className={`px-2 py-1 rounded-md text-xs font-bold ${res.status === '本登録' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'}`}>{res.status}</span></td>
+                                            <td className="p-3">
+                                                <span className={`px-2 py-1 rounded-md text-xs font-bold ${res.status === '受付済' ? 'bg-green-100 text-green-700' :
+                                                        res.status === '本登録' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'
+                                                    }`}>
+                                                    {res.status}
+                                                </span>
+                                            </td>
                                             <td className="p-3 font-bold text-gray-700">{res.group_name || '-'}</td>
                                             <td className="p-3 font-medium text-blue-900">{formatSlotTime(res.slot_id)}</td>
                                             <td className="p-3 font-medium text-gray-900">{res.last_name ? `${res.last_name} ${res.first_name}` : '（未入力）'}</td>
@@ -376,8 +429,8 @@ function AdminContent() {
                                             <td className="p-3 text-center">
                                                 <button
                                                     onClick={() => window.open(`/admin/ticket?id=${res.id}`, '_blank')}
-                                                    className="bg-white border border-gray-200 text-gray-700 font-bold text-xs px-2.5 py-1.5 rounded hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
-                                                    disabled={res.status !== '本登録'}
+                                                    className="bg-white border border-gray-200 text-gray-700 font-bold text-xs px-2.5 py-1.5 rounded hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm disabled:opacity-50"
+                                                    disabled={res.status === '仮登録'}
                                                 >
                                                     🎫 受付票
                                                 </button>
@@ -391,6 +444,89 @@ function AdminContent() {
                 </section>
             )}
 
+            {/* 🌟 2. 受付表（当日用）タブ */}
+            {activeTab === 'reception' && (
+                <section className="bg-white rounded-xl shadow-sm overflow-hidden">
+                    <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <h2 className="font-semibold text-gray-700 whitespace-nowrap">
+                            📋 当日受付表 <span className="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full text-xs ml-1">{receptionReservations.length}名</span>
+                        </h2>
+
+                        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                            <span className="text-sm font-bold text-gray-500">表示する枠:</span>
+                            <select value={receptionSlotId} onChange={(e) => setReceptionSlotId(e.target.value)} className="text-sm border rounded p-1.5 bg-white text-gray-600 outline-none max-w-[200px] font-bold">
+                                <option value="all">すべての日程</option>
+                                {slots.map(slot => (
+                                    <option key={slot.id} value={slot.id}>{formatSlotTime(slot.id)}</option>
+                                ))}
+                            </select>
+                            <button onClick={fetchReservations} className="text-xs bg-white border px-3 py-1.5 rounded hover:bg-gray-50 ml-auto md:ml-2">🔄 最新データに更新</button>
+                        </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse min-w-[700px]">
+                            <thead>
+                                <tr className="bg-indigo-50 text-indigo-800 text-xs uppercase font-semibold border-b border-indigo-100">
+                                    <th className="p-3 w-28">状態</th>
+                                    <th className="p-3 w-32">班 (クリックで編集)</th>
+                                    <th className="p-3">氏名</th>
+                                    <th className="p-3">学部・学科</th>
+                                    <th className="p-3 text-center w-24">人数</th>
+                                    <th className="p-3 text-center w-32">手動受付</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 text-sm">
+                                {receptionReservations.length === 0 ? (
+                                    <tr><td colSpan={6} className="p-8 text-center text-gray-400">表示するデータがありません。</td></tr>
+                                ) : (
+                                    receptionReservations.map((res) => (
+                                        <tr key={res.id} className={`transition-colors ${res.status === '受付済' ? 'bg-gray-50' : 'hover:bg-blue-50'}`}>
+                                            <td className="p-3">
+                                                <span className={`px-2 py-1 rounded-md text-xs font-bold ${res.status === '受付済' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                    {res.status}
+                                                </span>
+                                            </td>
+                                            <td className="p-3">
+                                                {/* 🌟 班を自由にテキスト入力で編集可能に（フォーカスが外れたら保存） */}
+                                                <input
+                                                    type="text"
+                                                    defaultValue={res.group_name || ''}
+                                                    onBlur={(e) => {
+                                                        if (e.target.value !== (res.group_name || '')) {
+                                                            handleUpdateGroup(res.id, e.target.value);
+                                                        }
+                                                    }}
+                                                    placeholder="未定"
+                                                    className="w-full p-1.5 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded bg-transparent focus:bg-white transition-all text-sm font-bold text-gray-700 outline-none"
+                                                />
+                                            </td>
+                                            <td className="p-3 font-medium text-gray-900">{res.last_name} {res.first_name}</td>
+                                            <td className="p-3">
+                                                <div className="text-gray-900 font-bold">{res.faculty}</div>
+                                                <div className="text-xs text-gray-500">{res.department}</div>
+                                            </td>
+                                            <td className="p-3 text-center font-bold text-gray-700">{res.attendee_count} 名</td>
+                                            <td className="p-3 text-center">
+                                                {/* 🌟 手動受付トグルボタン */}
+                                                <button
+                                                    onClick={() => handleToggleCheckin(res.id, res.status)}
+                                                    className={`w-full font-bold text-xs px-3 py-2 rounded transition-all shadow-sm ${res.status === '受付済' ? 'bg-gray-200 text-gray-600 hover:bg-gray-300' : 'bg-green-600 text-white hover:bg-green-700'
+                                                        }`}
+                                                >
+                                                    {res.status === '受付済' ? '↩ 取消' : '✓ 受付する'}
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            )}
+
+            {/* 🌟 3. 予約枠の設定タブ */}
             {activeTab === 'slots' && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     <div className={`md:col-span-1 bg-white p-6 rounded-xl shadow-sm h-fit border transition-colors ${editingSlotId ? 'border-amber-400 ring-2 ring-amber-400/10' : 'border-transparent'}`}>
