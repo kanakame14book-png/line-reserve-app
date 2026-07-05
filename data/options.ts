@@ -21,16 +21,6 @@ export const FACULTY_DEPARTMENT_MAP: Record<string, string[]> = {
 // 学部のリスト（辞書のキーから自動生成）
 export const FACULTIES = Object.keys(FACULTY_DEPARTMENT_MAP);
 
-// 旧入試区分リスト
-// export const ADMISSION_TYPES = [
-//   "一般選抜（前期）",
-//   "一般選抜（後期）",
-//   "学校推薦型選抜",
-//   "総合型選抜",
-//   "編入学試験",
-//   "その他"
-// ];
-
 // 志望度リスト
 export const MOTIVATION_LEVELS = [
   "第1志望",
@@ -62,20 +52,34 @@ export interface Reservation {
   slot_id: string;
 }
 
-// 🌟 ユーザーが選択する入試種別はこれだけでOK（選択肢が半分に激減します）
-export const ADMISSION_TYPES = [
+// ユーザーが選択する入試種別のリスト
+// ① 工学部・生命環境学部・教育学部などの共通リスト
+export const BASE_ADMISSION_TYPES = [
   '一般選抜（前期日程）',
   '一般選抜（後期日程）',
   '学校推薦型選抜Ⅰ',
-  '学校推薦型選抜Ⅱ',
   '総合型選抜Ⅰ',
   '総合型選抜Ⅱ',
   '3年次編入学',
   '私費外国人留学生入試',
   'その他・未定'
 ];
+// ② 医学部「医学科」専用のリスト
+export const MEDICINE_DOCTOR_ADMISSION_TYPES = [
+  '一般選抜（前期日程）',
+  '一般選抜（後期日程）',
+  '学校推薦型選抜Ⅱ',
+  'その他・未定'
+];
+// ③ 医学部「看護学科」専用のリスト
+export const MEDICINE_NURSING_ADMISSION_TYPES = [
+  '一般選抜（前期日程）',
+  '一般選抜（後期日程）',
+  '学校推薦型選抜Ⅰ',
+  'その他・未定'
+];
 
-// 🌟 裏側の判定用マスター（学部-学科-入試種別、または 学部-入試種別 の組み合わせ）
+// 合格発表日判定用マスター（学部-学科-入試種別、または 学部-入試種別 の組み合わせ）
 export const DETAILED_ANNOUNCEMENT_DATES: Record<string, string> = {
   // --- 学部共通の日程 ---
   '教育学部-一般選抜（前期日程）': '2027-03-06T10:00:00+09:00',

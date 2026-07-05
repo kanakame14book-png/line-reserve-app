@@ -2,7 +2,17 @@
 import { supabase } from '../supabase'; // データベース（Supabase）と通信するための道具
 import { useEffect, useState, Suspense } from 'react'; // Reactの基本機能（状態管理と、画面表示時の処理）
 import liff from '@line/liff'; // LINEアプリの中で動かすためのLINE公式ツール
-import { PREFECTURES, FACULTY_DEPARTMENT_MAP, FACULTIES, ADMISSION_TYPES, MOTIVATION_LEVELS, Slot, DETAILED_ANNOUNCEMENT_DATES } from '../data/options';
+import {
+  PREFECTURES,
+  FACULTY_DEPARTMENT_MAP,
+  FACULTIES,
+  BASE_ADMISSION_TYPES,
+  MEDICINE_DOCTOR_ADMISSION_TYPES,
+  MEDICINE_NURSING_ADMISSION_TYPES,
+  MOTIVATION_LEVELS,
+  Slot,
+  DETAILED_ANNOUNCEMENT_DATES
+} from '../data/options';
 
 function HomeContent() {
   // =========================================================================
@@ -43,6 +53,19 @@ function HomeContent() {
     setFaculty(e.target.value);
     setDepartment('');
   };
+
+  // どの入試区分のリストを表示するかを動的に決定するロジック
+  const getAdmissionOptions = () => {
+    if (faculty === '医学部') {
+      if (department === '医学科') return MEDICINE_DOCTOR_ADMISSION_TYPES;
+      if (department === '看護学科') return MEDICINE_NURSING_ADMISSION_TYPES;
+      return []; // 学部が医学部でも、学科がまだ未選択なら選択肢は空にする
+    }
+    // 医学部以外（工学部など）は通常の共通リストを返す
+    return BASE_ADMISSION_TYPES;
+  };
+
+  const currentOptions = getAdmissionOptions();
 
   // =========================================================================
   // 2. 【自動切り替えロジック】 (useEffect)
@@ -348,10 +371,28 @@ function HomeContent() {
           </select>
         </div>
         <div className="mb-2">
-          <label className="block text-sm font-bold mb-1 text-gray-600">受験（予定）の入試区分 <span className="text-red-500">*</span></label>
-          <select value={admissionType} onChange={(e) => setAdmissionType(e.target.value)} className="w-full p-2 border rounded-lg bg-white" required>
-            <option value="" disabled>選択してください</option>
-            {ADMISSION_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+          <label className="block text-sm font-bold mb-1 text-gray-600">
+            受験（予定）の入試区分 <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={admissionType}
+            onChange={(e) => setAdmissionType(e.target.value)}
+            className="w-full p-2 border rounded-lg bg-white"
+            required
+            disabled={!faculty || (faculty === '医学部' && !department)} // 🌟医学部の時は学科を選ぶまでロック
+          >
+            <option value="" disabled>
+              {!faculty
+                ? '先に学部を選択してください'
+                : faculty === '医学部' && !department
+                  ? '先に学科を選択してください'
+                  : '選択してください'}
+            </option>
+            {currentOptions.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
           </select>
         </div>
       </section>
