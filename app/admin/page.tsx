@@ -1,7 +1,7 @@
 "use client";
 import { supabase } from '../../supabase';
 import { useEffect, useState, Suspense } from 'react';
-import { Slot, FACULTIES } from '../../data/options'; // 🌟 FACULTIESを追加インポート
+import { Slot, FACULTIES } from '../../data/options';
 
 const generateTimeOptions = () => {
     const options = [];
@@ -30,6 +30,7 @@ interface Reservation {
     city: string;
     status: string;
     slot_id: string;
+    group_name?: string;
 }
 
 function AdminContent() {
@@ -37,27 +38,25 @@ function AdminContent() {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'users' | 'slots'>('users');
 
-    // --- ログインフォーム用State ---
     const [loginEmail, setLoginEmail] = useState('');
     const [loginPassword, setLoginPassword] = useState('');
     const [loginError, setLoginError] = useState<string | null>(null);
     const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-    // --- 登録者一覧用State ---
     const [reservations, setReservations] = useState<Reservation[]>([]);
 
-    // 🌟 フィルター用のState
     const [filterSlotId, setFilterSlotId] = useState<string>('all');
     const [filterStatus, setFilterStatus] = useState<string>('all');
     const [filterFaculty, setFilterFaculty] = useState<string>('all');
 
-    // --- 予約枠作成・管理用State ---
     const [slots, setSlots] = useState<Slot[]>([]);
     const [newDate, setNewDate] = useState('');
     const [newTime, setNewTime] = useState('');
     const [capacity, setCapacity] = useState<number>(5);
     const [eventType, setEventType] = useState('対面');
     const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
+
+    const [isAssigning, setIsAssigning] = useState(false);
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -200,7 +199,6 @@ function AdminContent() {
         }
     };
 
-    // 🌟 枠のIDから、わかりやすい日時の文字列を生成する関数
     const formatSlotTime = (slotId: string | null) => {
         if (!slotId) return '未選択';
         const slot = slots.find(s => s.id === slotId);
@@ -209,13 +207,61 @@ function AdminContent() {
         return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     };
 
-    // 🌟 フィルター処理を適用した登録者リストを計算
     const filteredReservations = reservations.filter(res => {
         const matchSlot = filterSlotId === 'all' || (filterSlotId === 'none' ? !res.slot_id : res.slot_id === filterSlotId);
         const matchStatus = filterStatus === 'all' || res.status === filterStatus;
         const matchFaculty = filterFaculty === 'all' || res.faculty === filterFaculty;
         return matchSlot && matchStatus && matchFaculty;
     });
+
+    // 締め切り後に管理者が手動で班分けを実行する関数
+    const handleAssignGroups = async (slotId: string) => {
+        if (!confirm('この枠の本登録者を学部ごとに【A班・B班・C班】の3班に自動で振り分けます。\nよろしいですか？')) return;
+
+        setIsAssigning(true);
+        try {
+            const targetUsers = reservations.filter(res => res.slot_id === slotId && res.status === '本登録');
+
+            if (targetUsers.length === 0) {
+                alert('この枠には本登録の対象者がいません。');
+                setIsAssigning(false);
+                return;
+            }
+
+            const byFaculty: Record<string, Reservation[]> = {};
+            targetUsers.forEach(user => {
+                if (!byFaculty[user.faculty]) byFaculty[user.faculty] = [];
+                byFaculty[user.faculty].push(user);
+            });
+
+            const updates = [];
+            const groupNames = ['A班', 'B班', 'C班'];
+
+            for (const fac in byFaculty) {
+                const students = byFaculty[fac];
+                students.sort((a, b) => (a.department || '').localeCompare(b.department || ''));
+
+                students.forEach((student, index) => {
+                    const groupName = groupNames[index % 3];
+                    updates.push(
+                        supabase
+                            .from('reservations')
+                            .update({ group_name: groupName })
+                            .eq('id', student.id)
+                    );
+                });
+            }
+
+            await Promise.all(updates);
+            alert('班分けが完了しました！登録者一覧から確認できます。');
+            fetchReservations();
+
+        } catch (error: any) {
+            alert('班分け処理中にエラーが発生しました: ' + error.message);
+        } finally {
+            setIsAssigning(false);
+        }
+    };
 
     if (loading && !session) {
         return <div className="p-8 text-center text-gray-500">システム起動中...</div>;
@@ -230,25 +276,11 @@ function AdminContent() {
                     <form onSubmit={handleLogin} className="space-y-4">
                         <div>
                             <label className="block text-sm font-bold text-gray-800 mb-1">メールアドレス</label>
-                            <input
-                                type="email"
-                                value={loginEmail}
-                                onChange={e => setLoginEmail(e.target.value)}
-                                className="w-full p-2.5 border rounded-lg outline-none text-gray-900 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                                placeholder="admin@example.com"
-                                required
-                            />
+                            <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} className="w-full p-2.5 border rounded-lg outline-none text-gray-900 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all" placeholder="admin@example.com" required />
                         </div>
                         <div>
                             <label className="block text-sm font-bold text-gray-800 mb-1">パスワード</label>
-                            <input
-                                type="password"
-                                value={loginPassword}
-                                onChange={e => setLoginPassword(e.target.value)}
-                                className="w-full p-2.5 border rounded-lg outline-none text-gray-900 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                                placeholder="••••••••"
-                                required
-                            />
+                            <input type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} className="w-full p-2.5 border rounded-lg outline-none text-gray-900 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all" placeholder="••••••••" required />
                         </div>
                         <button type="submit" disabled={isLoggingIn} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg transition-all disabled:bg-gray-400 mt-2">
                             {isLoggingIn ? 'ログイン中...' : 'ログイン'}
@@ -287,7 +319,6 @@ function AdminContent() {
                             登録者一覧 <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs ml-1">{filteredReservations.length}名</span>
                         </h2>
 
-                        {/* 🌟 フィルター用UI */}
                         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
                             <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="text-sm border rounded p-1.5 bg-white text-gray-600 outline-none">
                                 <option value="all">すべての状態</option>
@@ -317,7 +348,8 @@ function AdminContent() {
                             <thead>
                                 <tr className="bg-gray-100 text-gray-600 text-xs uppercase font-semibold border-b border-gray-200">
                                     <th className="p-3">区分</th>
-                                    <th className="p-3">予約日時</th> {/* 🌟 追加 */}
+                                    <th className="p-3">班</th>
+                                    <th className="p-3">予約日時</th>
                                     <th className="p-3">氏名</th>
                                     <th className="p-3">志望学部・学科</th>
                                     <th className="p-3">都道府県</th>
@@ -327,12 +359,12 @@ function AdminContent() {
                             </thead>
                             <tbody className="divide-y divide-gray-100 text-sm">
                                 {filteredReservations.length === 0 ? (
-                                    <tr><td colSpan={7} className="p-8 text-center text-gray-400">条件に一致するデータがありません。</td></tr>
+                                    <tr><td colSpan={8} className="p-8 text-center text-gray-400">条件に一致するデータがありません。</td></tr>
                                 ) : (
                                     filteredReservations.map((res) => (
                                         <tr key={res.id} className="hover:bg-gray-50 transition-colors">
                                             <td className="p-3"><span className={`px-2 py-1 rounded-md text-xs font-bold ${res.status === '本登録' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'}`}>{res.status}</span></td>
-                                            {/* 🌟 予約日時を表示 */}
+                                            <td className="p-3 font-bold text-gray-700">{res.group_name || '-'}</td>
                                             <td className="p-3 font-medium text-blue-900">{formatSlotTime(res.slot_id)}</td>
                                             <td className="p-3 font-medium text-gray-900">{res.last_name ? `${res.last_name} ${res.first_name}` : '（未入力）'}</td>
                                             <td className="p-3">
@@ -361,7 +393,6 @@ function AdminContent() {
 
             {activeTab === 'slots' && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    {/* 左側：入力・編集フォーム */}
                     <div className={`md:col-span-1 bg-white p-6 rounded-xl shadow-sm h-fit border transition-colors ${editingSlotId ? 'border-amber-400 ring-2 ring-amber-400/10' : 'border-transparent'}`}>
                         <div className="flex justify-between items-center mb-4 border-b pb-2">
                             <h2 className="text-lg font-bold text-gray-800">{editingSlotId ? '📝 予約枠の編集' : '新規枠の作成'}</h2>
@@ -400,7 +431,6 @@ function AdminContent() {
                         </form>
                     </div>
 
-                    {/* 右側：公開中の枠一覧 */}
                     <div className="md:col-span-2 bg-white p-6 rounded-xl shadow-sm">
                         <h2 className="text-lg font-bold mb-4 border-b pb-2">公開中の予約枠</h2>
                         {slots.length === 0 ? (
@@ -414,24 +444,36 @@ function AdminContent() {
                                     const isCurrentEditing = editingSlotId === slot.id;
 
                                     return (
-                                        <li key={slot.id} className={`flex items-center justify-between p-4 border rounded-lg transition-all ${isCurrentEditing ? 'bg-amber-50/50 border-amber-300 ring-1 ring-amber-300/30' : 'hover:bg-gray-50'
+                                        <li key={slot.id} className={`flex flex-col p-4 border rounded-lg transition-all ${isCurrentEditing ? 'bg-amber-50/50 border-amber-300 ring-1 ring-amber-300/30' : 'hover:bg-gray-50'
                                             }`}>
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <p className="text-lg font-bold text-gray-800">{dateStr} {timeStr}</p>
-                                                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${slot.event_type === 'オンライン' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                                                        {slot.event_type}
-                                                    </span>
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="text-lg font-bold text-gray-800">{dateStr} {timeStr}</p>
+                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${slot.event_type === 'オンライン' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                            {slot.event_type}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-sm text-gray-500 mt-1">定員: {slot.capacity}名</p>
                                                 </div>
-                                                <p className="text-sm text-gray-500 mt-1">定員: {slot.capacity}名</p>
+
+                                                <div className="flex items-center gap-2">
+                                                    <button onClick={() => handleEditClick(slot)} className="text-amber-600 hover:text-amber-800 font-bold text-sm px-3 py-1 border border-amber-200 hover:bg-amber-50 rounded">
+                                                        編集
+                                                    </button>
+                                                    <button onClick={() => handleDeleteSlot(slot.id)} className="text-red-500 hover:text-red-700 font-bold text-sm px-3 py-1 border border-red-200 hover:bg-red-50 rounded">
+                                                        削除
+                                                    </button>
+                                                </div>
                                             </div>
 
-                                            <div className="flex items-center gap-2">
-                                                <button onClick={() => handleEditClick(slot)} className="text-amber-600 hover:text-amber-800 font-bold text-sm px-3 py-1 border border-amber-200 hover:bg-amber-50 rounded">
-                                                    編集
-                                                </button>
-                                                <button onClick={() => handleDeleteSlot(slot.id)} className="text-red-500 hover:text-red-700 font-bold text-sm px-3 py-1 border border-red-200 hover:bg-red-50 rounded">
-                                                    削除
+                                            <div className="mt-4 pt-3 border-t border-gray-200 flex justify-end">
+                                                <button
+                                                    onClick={() => handleAssignGroups(slot.id)}
+                                                    disabled={isAssigning}
+                                                    className="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 font-bold text-sm px-4 py-2 rounded transition-colors"
+                                                >
+                                                    👥 3班構成で自動振り分けを実行
                                                 </button>
                                             </div>
                                         </li>
