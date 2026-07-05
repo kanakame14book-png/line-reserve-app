@@ -84,14 +84,21 @@ function HomeContent() {
 
     let targetDateStr = null;
 
-    // 辞書（options.ts）から、選ばれた条件に合う「合格発表日」を探し出す
-    if (department) {
-      const specificKey = `${faculty}-${department}-${admissionType}`;
-      targetDateStr = DETAILED_ANNOUNCEMENT_DATES[specificKey];
-    }
-    if (!targetDateStr) {
-      const generalKey = `${faculty}-${admissionType}`;
-      targetDateStr = DETAILED_ANNOUNCEMENT_DATES[generalKey];
+    // 「その他・未定」の場合は、全日程の中で最も遅い日付を自動計算して適用する
+    if (admissionType === 'その他・未定') {
+      const allDateTimes = Object.values(DETAILED_ANNOUNCEMENT_DATES).map(date => new Date(date).getTime());
+      const latestTime = Math.max(...allDateTimes);
+      targetDateStr = new Date(latestTime).toISOString();
+    } else {
+      // 辞書（options.ts）から、選ばれた条件に合う「合格発表日」を探し出す
+      if (department) {
+        const specificKey = `${faculty}-${department}-${admissionType}`;
+        targetDateStr = DETAILED_ANNOUNCEMENT_DATES[specificKey];
+      }
+      if (!targetDateStr) {
+        const generalKey = `${faculty}-${admissionType}`;
+        targetDateStr = DETAILED_ANNOUNCEMENT_DATES[generalKey];
+      }
     }
 
     // 辞書に載っていないイレギュラーな組み合わせだった場合は仮登録にする
@@ -105,9 +112,9 @@ function HomeContent() {
     const now = new Date();
 
     if (now >= announcementDate) {
-      setIsOfficial(true);   // 発表日を過ぎているなら【本登録モード】に切り替え！
+      setIsOfficial(true);   // 発表日を過ぎているなら【本登録モード】に切り替え
     } else {
-      setIsOfficial(false);  // まだ発表日前なら【仮登録モード】のまま！
+      setIsOfficial(false);  // まだ発表日前なら【仮登録モード】のまま
     }
   }, [faculty, department, admissionType]);
 
@@ -183,7 +190,16 @@ function HomeContent() {
 
         const now = new Date();
         const formattedSlots = (slotsData || [])
-          .filter((slot: any) => new Date(slot.start_time) > now)
+          .filter((slot: any) => {
+            // 🌟 修正：前日21時を締切としてフィルターにかける
+            const slotDate = new Date(slot.start_time);
+            const deadline = new Date(slotDate);
+            deadline.setDate(deadline.getDate() - 1);
+            deadline.setHours(21, 0, 0, 0);
+
+            // 現在時刻が締切より前であれば表示する
+            return now < deadline;
+          })
           .map((slot: any) => ({
             ...slot,
             reservation_count: counts[slot.id] || 0,
@@ -358,7 +374,7 @@ function HomeContent() {
             onChange={(e) => setAdmissionType(e.target.value)}
             className="w-full p-2 border rounded-lg bg-white"
             required
-            disabled={!department} // 🌟学部・学科のどちらも選択されるまで綺麗にロック
+            disabled={!department}
           >
             <option value="" disabled>
               {!faculty
@@ -379,7 +395,14 @@ function HomeContent() {
       {/* 🌟 2. 本登録モードのときだけ予約枠を表示する */}
       {isOfficial && (
         <section className="mb-6 rounded-xl bg-white p-4 shadow-sm animate-fade-in">
-          <h2 className="mb-3 font-semibold text-gray-700">2. ご希望の日時を選択 <span className="text-red-500">*</span></h2>
+          <h2 className="mb-1 font-semibold text-gray-700">2. ご希望の日時を選択 <span className="text-red-500">*</span></h2>
+
+          {/* 🌟 修正：ユーザーに締切を知らせる注意書き */}
+          <p className="text-xs text-red-500 mb-3 font-medium">
+            ※新規予約・日時の変更は前日の21:00までです。<br />
+            （やむを得ないキャンセルは直前まで可能です）
+          </p>
+
           {loading ? (
             <p className="text-sm text-gray-500 text-center py-4">予約枠を読み込み中...</p>
           ) : slots.length === 0 ? (

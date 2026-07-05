@@ -66,7 +66,6 @@ export const BASE_ADMISSION_TYPES = [
 ];
 // ② 医学部「医学科」専用のリスト
 export const MEDICINE_DOCTOR_ADMISSION_TYPES = [
-  '一般選抜（前期日程）',
   '一般選抜（後期日程）',
   '学校推薦型選抜Ⅱ',
   'その他・未定'
