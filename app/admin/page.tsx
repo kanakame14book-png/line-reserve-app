@@ -22,6 +22,9 @@ interface Reservation {
     created_at: string;
     last_name: string;
     first_name: string;
+    // 🌟 ふりがな用のデータを読み取れるように追加
+    last_name_kana: string;
+    first_name_kana: string;
     email: string;
     phone: string;
     faculty: string;
@@ -268,7 +271,6 @@ function AdminContent() {
         }
     };
 
-    // 🌟 人数の手動編集ハンドラー（選択されたら自動保存）
     const handleUpdateAttendeeCount = async (id: string, newCount: number) => {
         try {
             const { error } = await supabase.from('reservations').update({ attendee_count: newCount }).eq('id', id);
@@ -355,6 +357,7 @@ function AdminContent() {
                 </button>
             </div>
 
+            {/* 🌟 1. 登録者一覧タブ */}
             {activeTab === 'users' && (
                 <section className="bg-white rounded-xl shadow-sm overflow-hidden">
                     <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -418,7 +421,19 @@ function AdminContent() {
                                             <td className="p-3 font-bold text-gray-700">{res.group_name || '-'}</td>
                                             <td className="p-3 text-center text-gray-700">{res.attendee_count} 名</td>
                                             <td className="p-3 font-medium text-blue-900">{formatSlotTime(res.slot_id)}</td>
-                                            <td className="p-3 font-medium text-gray-900">{res.last_name ? `${res.last_name} ${res.first_name}` : '（未入力）'}</td>
+
+                                            {/* 🌟 氏名の下にふりがなを表示 */}
+                                            <td className="p-3">
+                                                <div className="font-medium text-gray-900">
+                                                    {res.last_name ? `${res.last_name} ${res.first_name}` : '（未入力）'}
+                                                </div>
+                                                {res.last_name_kana && (
+                                                    <div className="text-xs text-gray-500 mt-0.5">
+                                                        {res.last_name_kana} {res.first_name_kana}
+                                                    </div>
+                                                )}
+                                            </td>
+
                                             <td className="p-3">
                                                 <div className="text-gray-900">{res.faculty}</div>
                                                 <div className="text-xs text-gray-500">{res.department}</div>
@@ -443,6 +458,7 @@ function AdminContent() {
                 </section>
             )}
 
+            {/* 🌟 2. 受付表（当日用）タブ */}
             {activeTab === 'reception' && (
                 <section className="bg-white rounded-xl shadow-sm overflow-hidden">
                     <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -498,13 +514,24 @@ function AdminContent() {
                                                     className="w-full p-1.5 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded bg-transparent focus:bg-white transition-all text-sm font-bold text-gray-700 outline-none"
                                                 />
                                             </td>
-                                            <td className="p-3 font-medium text-gray-900">{res.last_name} {res.first_name}</td>
+
+                                            {/* 🌟 氏名の下にふりがなを表示 */}
+                                            <td className="p-3">
+                                                <div className="font-medium text-gray-900">
+                                                    {res.last_name ? `${res.last_name} ${res.first_name}` : '（未入力）'}
+                                                </div>
+                                                {res.last_name_kana && (
+                                                    <div className="text-xs text-gray-500 mt-0.5">
+                                                        {res.last_name_kana} {res.first_name_kana}
+                                                    </div>
+                                                )}
+                                            </td>
+
                                             <td className="p-3">
                                                 <div className="text-gray-900 font-bold">{res.faculty}</div>
                                                 <div className="text-xs text-gray-500">{res.department}</div>
                                             </td>
                                             <td className="p-3 text-center font-bold text-gray-700 whitespace-nowrap">
-                                                {/* 🌟 人数をプルダウンで直接変更できるようにしました */}
                                                 <select
                                                     value={res.attendee_count}
                                                     onChange={(e) => handleUpdateAttendeeCount(res.id, Number(e.target.value))}
@@ -534,6 +561,7 @@ function AdminContent() {
                 </section>
             )}
 
+            {/* 🌟 3. 予約枠の設定タブ */}
             {activeTab === 'slots' && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     <div className={`md:col-span-1 bg-white p-6 rounded-xl shadow-sm h-fit border transition-colors ${editingSlotId ? 'border-amber-400 ring-2 ring-amber-400/10' : 'border-transparent'}`}>
