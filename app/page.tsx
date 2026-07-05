@@ -24,7 +24,7 @@ function HomeContent() {
   const [selectedSlotId, setSelectedSlotId] = useState<string>(''); // ユーザーが選んだ日時のID
   const [existingReservation, setExistingReservation] = useState<any>(null); // すでに予約済みかどうかのデータ
 
-  // 🌟 モード管理：ここが true なら「本登録（合格後）」、false なら「仮登録」になる
+  // モード管理：ここが true なら「本登録（合格後）」、false なら「仮登録」になる
   const [isOfficial, setIsOfficial] = useState<boolean>(false);
   const currentStatusText = isOfficial ? '本登録' : '仮登録';
 
@@ -191,7 +191,7 @@ function HomeContent() {
         const now = new Date();
         const formattedSlots = (slotsData || [])
           .filter((slot: any) => {
-            // 🌟 修正：前日21時を締切としてフィルターにかける
+            // 前日21時を締切としてフィルターにかける
             const slotDate = new Date(slot.start_time);
             const deadline = new Date(slotDate);
             deadline.setDate(deadline.getDate() - 1);
@@ -305,8 +305,15 @@ function HomeContent() {
   };
 
   // =========================================================================
-  // 7. 【UIの表示制御】 送信ボタンを押せるかどうかの判定
+  // 7. 【UIの表示制御・入力規則バリデーション】
   // =========================================================================
+
+  // 入力規則の正規表現
+  const isHiragana = (text: string) => /^[ぁ-んー]+$/.test(text);
+  const isValidPhone = (text: string) => /^0\d{1,4}-?\d{1,4}-?\d{3,4}$/.test(text);
+  const isValidEmail = (text: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text);
+
+  // いずれかの条件を満たさない場合、送信ボタンが押せなくなる
   const isFormValid =
     faculty &&
     department &&
@@ -316,10 +323,10 @@ function HomeContent() {
       selectedSlotId &&
       lastName &&
       firstName &&
-      lastNameKana &&
-      firstNameKana &&
-      email &&
-      phone &&
+      lastNameKana && isHiragana(lastNameKana) &&
+      firstNameKana && isHiragana(firstNameKana) &&
+      email && isValidEmail(email) &&
+      phone && isValidPhone(phone) &&
       city) : true);
 
   if (liffError) return <div className="p-4 text-red-500">LIFFエラー: {liffError}</div>;
@@ -348,7 +355,7 @@ function HomeContent() {
         </section>
       )}
 
-      {/* 🌟 1. 志望情報（必須） */}
+      {/* 1. 志望情報（必須） */}
       <section className="mb-6 rounded-xl bg-white p-4 shadow-sm border-l-4 border-blue-500">
         <h2 className="mb-4 font-semibold text-gray-700 border-b pb-2">1. 志望情報（必須）</h2>
         <div className="mb-4">
@@ -392,12 +399,11 @@ function HomeContent() {
         </div>
       </section>
 
-      {/* 🌟 2. 本登録モードのときだけ予約枠を表示する */}
+      {/* 2. 本登録モードのときだけ予約枠を表示する */}
       {isOfficial && (
         <section className="mb-6 rounded-xl bg-white p-4 shadow-sm animate-fade-in">
           <h2 className="mb-1 font-semibold text-gray-700">2. ご希望の日時を選択 <span className="text-red-500">*</span></h2>
 
-          {/* 🌟 修正：ユーザーに締切を知らせる注意書き */}
           <p className="text-xs text-red-500 mb-3 font-medium">
             ※新規予約・日時の変更は前日の21:00までです。<br />
             （やむを得ないキャンセルは直前まで可能です）
@@ -451,7 +457,7 @@ function HomeContent() {
         </section>
       )}
 
-      {/* 🌟 3. 来場者情報の入力（名前やメアドは本登録のみ出現） */}
+      {/* 3. 来場者情報の入力（名前やメアドは本登録のみ出現） */}
       <section className="mb-6 rounded-xl bg-white p-4 shadow-sm">
         <h2 className="mb-4 font-semibold text-gray-700 border-b pb-2">{isOfficial ? '3. 来場者情報の入力' : '2. 追加アンケート'}</h2>
 
@@ -469,6 +475,7 @@ function HomeContent() {
               <label className="block text-sm font-bold mb-1 text-gray-600">市区町村 <span className="text-red-500">*</span></label>
               <input type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder="甲府市武田" className="w-full p-2 border rounded-lg" required />
             </div>
+
             <div className="mb-4">
               <label className="block text-sm font-bold mb-1 text-gray-600">お名前 <span className="text-red-500">*</span></label>
               <div className="grid grid-cols-2 gap-2">
@@ -476,21 +483,37 @@ function HomeContent() {
                 <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="太郎" className="w-full p-2 border rounded-lg" required />
               </div>
             </div>
+
+            {/* ふりがなの入力欄（エラー時に赤くする処理を追加） */}
             <div className="mb-4">
               <label className="block text-sm font-bold mb-1 text-gray-600">ふりがな <span className="text-red-500">*</span></label>
               <div className="grid grid-cols-2 gap-2">
-                <input type="text" value={lastNameKana} onChange={(e) => setLastNameKana(e.target.value)} placeholder="やまだ" className="w-full p-2 border rounded-lg" required />
-                <input type="text" value={firstNameKana} onChange={(e) => setFirstNameKana(e.target.value)} placeholder="たろう" className="w-full p-2 border rounded-lg" required />
+                <input type="text" value={lastNameKana} onChange={(e) => setLastNameKana(e.target.value)} placeholder="やまだ" className={`w-full p-2 border rounded-lg ${lastNameKana && !isHiragana(lastNameKana) ? 'border-red-500 bg-red-50' : ''}`} required />
+                <input type="text" value={firstNameKana} onChange={(e) => setFirstNameKana(e.target.value)} placeholder="たろう" className={`w-full p-2 border rounded-lg ${firstNameKana && !isHiragana(firstNameKana) ? 'border-red-500 bg-red-50' : ''}`} required />
               </div>
+              {((lastNameKana && !isHiragana(lastNameKana)) || (firstNameKana && !isHiragana(firstNameKana))) && (
+                <p className="text-xs text-red-500 mt-1">※ふりがなは「ひらがな」で入力してください</p>
+              )}
             </div>
+
+            {/* 電話番号の入力欄（エラー時に赤くする処理を追加） */}
             <div className="mb-4">
               <label className="block text-sm font-bold mb-1 text-gray-600">電話番号 <span className="text-red-500">*</span></label>
-              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="090-1234-5678" className="w-full p-2 border rounded-lg" required />
+              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="090-1234-5678" className={`w-full p-2 border rounded-lg ${phone && !isValidPhone(phone) ? 'border-red-500 bg-red-50' : ''}`} required />
+              {phone && !isValidPhone(phone) && (
+                <p className="text-xs text-red-500 mt-1">※正しい電話番号を半角で入力してください</p>
+              )}
             </div>
+
+            {/* メールアドレスの入力欄（エラー時に赤くする処理を追加） */}
             <div className="mb-4">
               <label className="block text-sm font-bold mb-1 text-gray-600">メールアドレス <span className="text-red-500">*</span></label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@yamanashi.ac.jp" className="w-full p-2 border rounded-lg" required />
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@yamanashi.ac.jp" className={`w-full p-2 border rounded-lg ${email && !isValidEmail(email) ? 'border-red-500 bg-red-50' : ''}`} required />
+              {email && !isValidEmail(email) && (
+                <p className="text-xs text-red-500 mt-1">※正しいメールアドレスを半角で入力してください</p>
+              )}
             </div>
+
             <div className="mb-4">
               <label className="block text-sm font-bold mb-1 text-gray-600">来場予定人数 <span className="text-red-500">*</span></label>
               <select value={attendeeCount} onChange={(e) => setAttendeeCount(Number(e.target.value))} className="w-full p-2 border rounded-lg bg-white" required>
@@ -516,7 +539,7 @@ function HomeContent() {
           onClick={handleReserve}
           className={`w-full rounded-xl py-4 text-center font-bold text-white transition-all ${isFormValid && !isSubmitting ? 'bg-green-600 hover:bg-green-700 active:scale-95 shadow-md' : 'bg-gray-300 cursor-not-allowed'}`}
         >
-          {isSubmitting ? '予約を送信中...' : isFormValid ? `この内容で${currentStatusText}を確定する` : '必要事項を入力してください'}
+          {isSubmitting ? '予約を送信中...' : isFormValid ? `この内容で${currentStatusText}を確定する` : '必要事項を正しく入力してください'}
         </button>
       </div>
       <div className="h-24"></div>
