@@ -57,7 +57,8 @@ function TicketContent() {
     const qrValue = encodeURIComponent(`${window.location.origin}/admin/checkin?id=${reservation.id}`);
     const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${qrValue}`;
 
-    const isOfficial = reservation.status === '本登録';
+    // 受付後（受付済）も予約確定者なので、本登録と同様に予約日時を表示する（Issue #14）
+    const isOfficial = reservation.status === '本登録' || reservation.status === '受付済';
 
     return (
         <main className="min-h-screen bg-gray-50 py-10 px-4 flex flex-col items-center justify-start font-sans text-gray-800 print:bg-white print:py-0">
