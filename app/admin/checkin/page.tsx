@@ -2,6 +2,7 @@
 import { supabase } from '../../../supabase';
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { tryCloseWindow } from '../../lib/close';
 
 function CheckinContent() {
     const searchParams = useSearchParams();
@@ -10,7 +11,8 @@ function CheckinContent() {
     const [session, setSession] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [studentInfo, setStudentInfo] = useState<any>(null);
-    const [checkinStatus, setCheckinStatus] = useState<'success' | 'already' | 'error' | null>(null);
+    const [checkinStatus, setCheckinStatus] = useState<'success' | 'already' | 'unregistered' | 'error' | null>(null);
+    const [closeHint, setCloseHint] = useState(false); // 閉じるボタンが効かない環境向け案内
 
     // 1. ログイン状態の監視
     useEffect(() => {
@@ -43,6 +45,9 @@ function CheckinContent() {
             // すでに受付済みの場合は二重更新しない
             if (resData.status === '受付済') {
                 setCheckinStatus('already');
+            } else if (resData.status === '仮登録') {
+                // 本登録が済んでいない（仮登録の）人は受付できない。スキャナー経路と挙動を揃える。
+                setCheckinStatus('unregistered');
             } else {
                 // ステータスを「受付済」に更新
                 const { error: updateError } = await supabase
@@ -98,6 +103,14 @@ function CheckinContent() {
                     </div>
                 )}
 
+                {checkinStatus === 'unregistered' && (
+                    <div className="mb-6">
+                        <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-4xl mx-auto mb-3">!</div>
+                        <h1 className="text-xl font-bold text-red-600">本登録が完了していません</h1>
+                        <p className="text-sm text-gray-500 mt-2">（仮登録の状態です）</p>
+                    </div>
+                )}
+
                 {checkinStatus === 'error' && (
                     <div className="mb-6">
                         <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-4xl mx-auto mb-3">×</div>
@@ -133,11 +146,16 @@ function CheckinContent() {
 
                 <div className="mt-6 pt-4 border-t border-gray-100">
                     <button
-                        onClick={() => window.close()}
+                        onClick={() => tryCloseWindow(() => setCloseHint(true))}
                         className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2.5 rounded-lg transition-all"
                     >
                         この画面を閉じる
                     </button>
+                    {closeHint && (
+                        <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                            このタブは自動で閉じられませんでした。ブラウザの「×」ボタンで閉じてください。
+                        </p>
+                    )}
                 </div>
 
             </div>

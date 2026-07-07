@@ -2,6 +2,8 @@
 import { supabase } from '../../../supabase';
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { tryCloseWindow } from '../../lib/close';
+import { QrTrademark } from '../../components/QrTrademark';
 
 function TicketContent() {
     const searchParams = useSearchParams();
@@ -10,6 +12,7 @@ function TicketContent() {
     const [reservation, setReservation] = useState<any>(null);
     const [slot, setSlot] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [closeHint, setCloseHint] = useState(false); // 閉じるボタンが効かない環境向け案内
 
     useEffect(() => {
         if (!resId) {
@@ -57,19 +60,25 @@ function TicketContent() {
     const qrValue = encodeURIComponent(`${window.location.origin}/admin/checkin?id=${reservation.id}`);
     const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${qrValue}`;
 
-    const isOfficial = reservation.status === '本登録';
+    // 受付後（受付済）も予約確定者なので、本登録と同様に予約日時を表示する（Issue #14）
+    const isOfficial = reservation.status === '本登録' || reservation.status === '受付済';
 
     return (
         <main className="min-h-screen bg-gray-50 py-10 px-4 flex flex-col items-center justify-start font-sans text-gray-800 print:bg-white print:py-0">
 
             <div className="w-full max-w-md flex justify-between mb-6 print:hidden">
-                <button onClick={() => window.close()} className="text-sm text-gray-500 hover:text-gray-700 font-medium">
+                <button onClick={() => tryCloseWindow(() => setCloseHint(true))} className="text-sm text-gray-500 hover:text-gray-700 font-medium">
                     ← 閉じる
                 </button>
                 <button onClick={handlePrint} className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-4 py-2 rounded-lg shadow-sm transition-all">
                     🖨️ このページを印刷 / PDF保存
                 </button>
             </div>
+            {closeHint && (
+                <div className="w-full max-w-md mb-6 print:hidden rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800 text-center">
+                    このタブは自動で閉じられませんでした。ブラウザ（またはLINE）の「×」ボタンで閉じてください。
+                </div>
+            )}
 
             <div className="w-full max-w-md bg-white border border-gray-200 rounded-2xl shadow-sm p-6 relative print:border-0 print:shadow-none">
                 <div className="absolute inset-4 border-2 border-dashed border-gray-100 pointer-events-none rounded-xl print:border-gray-300"></div>
@@ -128,6 +137,7 @@ function TicketContent() {
                     </div>
                     <p className="text-[10px] text-gray-400 tracking-widest">ID: {reservation.id}</p>
                     <p className="text-xs text-gray-500 mt-2 font-medium">当日はこのQRコードを受付にご提示ください</p>
+                    <QrTrademark className="mt-2" />
                 </div>
 
             </div>

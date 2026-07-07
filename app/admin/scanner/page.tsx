@@ -2,11 +2,15 @@
 import { supabase } from '../../../supabase';
 import { useEffect, useState, Suspense, useRef } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
+import { tryCloseWindow } from '../../lib/close';
+import { QrTrademark } from '../../components/QrTrademark';
+// 🌟 useRouter は不要になったので削除しました！
 
 function ScannerContent() {
     const [session, setSession] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [isScanning, setIsScanning] = useState(false);
+    const [closeHint, setCloseHint] = useState(false); // 閉じるボタンが効かない環境向け案内
 
     const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
 
@@ -138,11 +142,16 @@ function ScannerContent() {
                     <p className="text-red-500 font-bold mb-4">⚠ 受付を行うには管理者ログインが必要です</p>
                     <p className="text-sm text-gray-500 mb-6">管理画面から再度「QR受付」を開き直してください。</p>
                     <button
-                        onClick={() => window.close()}
+                        onClick={() => tryCloseWindow(() => setCloseHint(true))}
                         className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2.5 px-6 rounded-lg transition-all w-full"
                     >
                         このタブを閉じる
                     </button>
+                    {closeHint && (
+                        <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                            このタブは自動で閉じられませんでした。ブラウザの「×」ボタンで閉じてください。
+                        </p>
+                    )}
                 </div>
             </main>
         );
@@ -255,6 +264,9 @@ function ScannerContent() {
                     </section>
                 )}
             </div>
+            <footer className="mt-6 text-center">
+                <QrTrademark />
+            </footer>
         </main>
     );
 }
