@@ -1,23 +1,37 @@
 "use client";
-import { supabase } from '../supabase';
-import { useEffect, useState, Suspense } from 'react';
-import liff from '@line/liff';
-import { useSearchParams } from 'next/navigation';
-import { PREFECTURES, FACULTY_DEPARTMENT_MAP, FACULTIES, ADMISSION_TYPES, MOTIVATION_LEVELS, Slot } from '../data/options';
+import { supabase } from '../supabase'; // データベース（Supabase）と通信するための道具
+import { useEffect, useState, Suspense } from 'react'; // Reactの基本機能（状態管理と、画面表示時の処理）
+import liff from '@line/liff'; // LINEアプリの中で動かすためのLINE公式ツール
+import {
+  PREFECTURES,
+  FACULTY_DEPARTMENT_MAP,
+  FACULTIES,
+  BASE_ADMISSION_TYPES,
+  MEDICINE_DOCTOR_ADMISSION_TYPES,
+  MEDICINE_NURSING_ADMISSION_TYPES,
+  MOTIVATION_LEVELS,
+  Slot,
+  DETAILED_ANNOUNCEMENT_DATES
+} from '../data/options';
 
 function HomeContent() {
-  const searchParams = useSearchParams();
-  const urlStatus = searchParams.get('status');
-  const isOfficial = urlStatus === 'official';
+  // =========================================================================
+  // 1. 【状態管理（State）】
+  // =========================================================================
+  const [liffError, setLiffError] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null); // LINEの登録名
+  const [slots, setSlots] = useState<Slot[]>([]); // データベースから取ってきた予約枠のリスト
+  const [selectedSlotId, setSelectedSlotId] = useState<string>(''); // ユーザーが選んだ日時のID
+  const [existingReservation, setExistingReservation] = useState<any>(null); // すでに予約済みかどうかのデータ
+
+  // モード管理：ここが true なら「本登録（合格後）」、false なら「仮登録」になる
+  const [isOfficial, setIsOfficial] = useState<boolean>(false);
   const currentStatusText = isOfficial ? '本登録' : '仮登録';
 
-  const [liffError, setLiffError] = useState<string | null>(null);
-  const [displayName, setDisplayName] = useState<string | null>(null);
-  const [slots, setSlots] = useState<Slot[]>([]);
-  const [selectedSlotId, setSelectedSlotId] = useState<string>('');
-  const [existingReservation, setExistingReservation] = useState<any>(null);
-
-  // 🌟 メールアドレスは本登録のみ管理（初期値空文字）
+  // フォームの入力項目を保存するためのState群
+  const [faculty, setFaculty] = useState('');
+  const [department, setDepartment] = useState('');
+  const [admissionType, setAdmissionType] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [lastName, setLastName] = useState('');
@@ -26,20 +40,87 @@ function HomeContent() {
   const [firstNameKana, setFirstNameKana] = useState('');
   const [prefecture, setPrefecture] = useState('');
   const [city, setCity] = useState('');
-  const [faculty, setFaculty] = useState('');
-  const [department, setDepartment] = useState('');
   const [attendeeCount, setAttendeeCount] = useState<number>(1);
-  const [admissionType, setAdmissionType] = useState('');
   const [motivationLevel, setMotivationLevel] = useState('');
 
-  const [loading, setLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true); // 画面読み込み中かどうか
+  const [isSubmitting, setIsSubmitting] = useState(false); // ボタンを押して送信中かどうか（連打防止用）
 
+  // 学部が変更されたときの処理（選ばれていた学科・入試区分を一度リセットする）
   const handleFacultyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setFaculty(e.target.value);
     setDepartment('');
+    setAdmissionType(''); // 学部が変わったら入試区分も安全のためリセット
   };
 
+  // 学科が変更されたときの処理
+  const handleDepartmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setDepartment(e.target.value);
+    setAdmissionType(''); // 学科が変わったら入試区分も安全のためリセット
+  };
+
+  // どの入試区分のリストを表示するかを動的に決定するロジック
+  const getAdmissionOptions = () => {
+    if (faculty === '医学部') {
+      if (department === '医学科') return MEDICINE_DOCTOR_ADMISSION_TYPES;
+      if (department === '看護学科') return MEDICINE_NURSING_ADMISSION_TYPES;
+      return []; // 学部が医学部でも、学科がまだ未選択なら選択肢は空にする
+    }
+    // 医学部以外（工学部など）は通常の共通リストを返す
+    return BASE_ADMISSION_TYPES;
+  };
+
+  const currentOptions = getAdmissionOptions();
+
+  // =========================================================================
+  // 2. 【自動切り替えロジック】 (useEffect)
+  // =========================================================================
+  useEffect(() => {
+    // 学部か入試区分のどちらかが空っぽなら、とりあえず「仮登録」にしておく
+    if (!faculty || !admissionType) {
+      setIsOfficial(false);
+      return;
+    }
+
+    let targetDateStr = null;
+
+    // 「その他・未定」の場合は、全日程の中で最も遅い日付を自動計算して適用する
+    if (admissionType === 'その他・未定') {
+      const allDateTimes = Object.values(DETAILED_ANNOUNCEMENT_DATES).map(date => new Date(date).getTime());
+      const latestTime = Math.max(...allDateTimes);
+      targetDateStr = new Date(latestTime).toISOString();
+    } else {
+      // 辞書（options.ts）から、選ばれた条件に合う「合格発表日」を探し出す
+      if (department) {
+        const specificKey = `${faculty}-${department}-${admissionType}`;
+        targetDateStr = DETAILED_ANNOUNCEMENT_DATES[specificKey];
+      }
+      if (!targetDateStr) {
+        const generalKey = `${faculty}-${admissionType}`;
+        targetDateStr = DETAILED_ANNOUNCEMENT_DATES[generalKey];
+      }
+    }
+
+    // 辞書に載っていないイレギュラーな組み合わせだった場合は仮登録にする
+    if (!targetDateStr) {
+      setIsOfficial(false);
+      return;
+    }
+
+    // 現在の時刻と、辞書から見つけた合格発表の時刻を比較する
+    const announcementDate = new Date(targetDateStr);
+    const now = new Date();
+
+    if (now >= announcementDate) {
+      setIsOfficial(true);   // 発表日を過ぎているなら【本登録モード】に切り替え
+    } else {
+      setIsOfficial(false);  // まだ発表日前なら【仮登録モード】のまま
+    }
+  }, [faculty, department, admissionType]);
+
+  // =========================================================================
+  // 3. 【データベース通信】 既存データの取得
+  // =========================================================================
   const loadMyData = async () => {
     const { data } = await supabase
       .from('reservations')
@@ -60,7 +141,6 @@ function HomeContent() {
       setFaculty(data.faculty || '');
       setDepartment(data.department || '');
       setSelectedSlotId(data.slot_id || '');
-      // 🌟 再送信時に来場人数・入試区分・志望度が初期値へ上書きされないよう復元する
       setAttendeeCount(data.attendee_count || 1);
       setAdmissionType(data.admission_type || '');
       setMotivationLevel(data.motivation_level || '');
@@ -69,6 +149,9 @@ function HomeContent() {
     }
   };
 
+  // =========================================================================
+  // 4. 【初期化処理】
+  // =========================================================================
   useEffect(() => {
     const initApp = async () => {
       try {
@@ -107,7 +190,16 @@ function HomeContent() {
 
         const now = new Date();
         const formattedSlots = (slotsData || [])
-          .filter((slot: any) => new Date(slot.start_time) > now)
+          .filter((slot: any) => {
+            // 前日21時を締切としてフィルターにかける
+            const slotDate = new Date(slot.start_time);
+            const deadline = new Date(slotDate);
+            deadline.setDate(deadline.getDate() - 1);
+            deadline.setHours(21, 0, 0, 0);
+
+            // 現在時刻が締切より前であれば表示する
+            return now < deadline;
+          })
           .map((slot: any) => ({
             ...slot,
             reservation_count: counts[slot.id] || 0,
@@ -125,6 +217,9 @@ function HomeContent() {
     fetchSlotsAndReservations();
   }, []);
 
+  // =========================================================================
+  // 5. 【キャンセル処理】
+  // =========================================================================
   const handleCancelReservation = async () => {
     if (!confirm(`本当にこの${existingReservation.status}をキャンセルしますか？`)) return;
     setIsSubmitting(true);
@@ -139,9 +234,11 @@ function HomeContent() {
     }
   };
 
+  // =========================================================================
+  // 6. 【登録（送信）処理】
+  // =========================================================================
   const handleReserve = async () => {
-    // 🌟 仮登録の必須項目から email を完全に除外
-    if (!prefecture || !faculty || !department) {
+    if (!prefecture || !faculty || !department || !admissionType) {
       alert('必須項目(*)を入力してください');
       return;
     }
@@ -151,7 +248,6 @@ function HomeContent() {
         alert('日時を選択してください');
         return;
       }
-      // 🌟 本登録のときだけ email の入力を厳格にチェック
       if (!lastName || !firstName || !lastNameKana || !firstNameKana || !email || !phone || !city) {
         alert('本登録には全必須項目を入力してください');
         return;
@@ -168,7 +264,6 @@ function HomeContent() {
     const cleanData = (val: string) => (val === "" ? null : val);
 
     try {
-      // 🌟 返ってきたレコードのID（UUID）を取得できるように .select() を末尾に追加
       const { data: insertedData, error } = await supabase.from('reservations').upsert([{
         line_user_name: displayName || '不明なユーザー',
         line_user_id: liff.getContext()?.userId || '不明なID',
@@ -184,8 +279,8 @@ function HomeContent() {
         prefecture: prefecture,
         city: cleanData(city),
         attendee_count: attendeeCount,
-        admission_type: admissionType || null,
-        motivation_level: motivationLevel || null,
+        admission_type: admissionType,
+        motivation_level: isOfficial ? null : cleanData(motivationLevel),
         status: currentStatusText,
       }], { onConflict: 'line_user_id' }).select().single();
 
@@ -194,11 +289,8 @@ function HomeContent() {
       const dateStr = targetSlot
         ? new Date(targetSlot.start_time).toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
         : '';
-
-      // 🌟 自動生成される受付票のURL（本番環境に合わせてドメイン部分は調整してください）
       const ticketUrl = `${window.location.origin}/admin/ticket?id=${insertedData.id}`;
 
-      // 🌟 本登録確定時に、LINEトーク画面へ受付票のURLを自動で叩き込むメッセージを構成
       const messageText = isOfficial
         ? `【来場予約（本登録）が確定しました】\n\n合格おめでとうございます！🎉\n応援センターの予約を受付いたしました。\n\n形式: ${targetSlot?.event_type || '対面'}\n日時: ${dateStr}~\nお名前: ${lastName} 様\n\n👇当日の受付票はこちら（スマホでご提示ください）\n${ticketUrl}`
         : `【仮登録が確定しました】\n\nお名前: ${displayName} 様\n\n山梨大学への合格をご祈念しております！`;
@@ -212,29 +304,43 @@ function HomeContent() {
     }
   };
 
-  // 🌟 ボタンの活性化バリデーションからも仮登録時の email 縛りを解除
+  // =========================================================================
+  // 7. 【UIの表示制御・入力規則バリデーション】
+  // =========================================================================
+
+  // 入力規則の正規表現
+  const isHiragana = (text: string) => /^[ぁ-んー]+$/.test(text);
+  const isValidPhone = (text: string) => /^0\d{1,4}-?\d{1,4}-?\d{3,4}$/.test(text);
+  const isValidEmail = (text: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text);
+
+  // いずれかの条件を満たさない場合、送信ボタンが押せなくなる
   const isFormValid =
-    prefecture &&
     faculty &&
     department &&
+    admissionType &&
+    prefecture &&
     (isOfficial ? (
       selectedSlotId &&
       lastName &&
       firstName &&
-      lastNameKana &&
-      firstNameKana &&
-      email &&
-      phone &&
+      lastNameKana && isHiragana(lastNameKana) &&
+      firstNameKana && isHiragana(firstNameKana) &&
+      email && isValidEmail(email) &&
+      phone && isValidPhone(phone) &&
       city) : true);
 
   if (liffError) return <div className="p-4 text-red-500">LIFFエラー: {liffError}</div>;
 
+  // =========================================================================
+  // 8. 【画面の描画（JSX）】
+  // =========================================================================
   return (
     <main className="min-h-screen bg-gray-50 p-4 pb-28 font-sans text-gray-800">
       <header className="mb-6 text-center">
         <h1 className="text-xl font-bold text-green-600">
           {isOfficial ? '【合格者対象】本登録フォーム' : '予約フォーム（仮登録）'}
         </h1>
+        <p className="text-xs text-gray-500 mt-1">※合格発表後に自動で本登録に切り替わります</p>
       </header>
 
       {existingReservation && (
@@ -249,9 +355,67 @@ function HomeContent() {
         </section>
       )}
 
+      {/* 🌟 1. 志望情報 / 入学先情報（必須） */}
+      <section className="mb-6 rounded-xl bg-white p-4 shadow-sm border-l-4 border-blue-500">
+        <h2 className="mb-4 font-semibold text-gray-700 border-b pb-2">
+          {/* 本登録時は「入学予定の情報」、仮登録時は「志望情報」に切り替え */}
+          {isOfficial ? '1. 入学予定の情報（必須）' : '1. 志望情報（必須）'}
+        </h2>
+
+        <div className="mb-4">
+          <label className="block text-sm font-bold mb-1 text-gray-600">学部 <span className="text-red-500">*</span></label>
+          <select value={faculty} onChange={handleFacultyChange} className="w-full p-2 border rounded-lg bg-white" required>
+            <option value="" disabled>選択してください</option>
+            {FACULTIES.map((fac) => <option key={fac} value={fac}>{fac}</option>)}
+          </select>
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-sm font-bold mb-1 text-gray-600">学科・コース <span className="text-red-500">*</span></label>
+          <select value={department} onChange={handleDepartmentChange} className="w-full p-2 border rounded-lg bg-white" required disabled={!faculty}>
+            <option value="" disabled>{faculty ? "選択してください" : "先に学部を選択してください"}</option>
+            {faculty && (FACULTY_DEPARTMENT_MAP[faculty] ?? []).map((dep) => <option key={dep} value={dep}>{dep}</option>)}
+          </select>
+        </div>
+
+        <div className="mb-2">
+          <label className="block text-sm font-bold mb-1 text-gray-600">
+            {/* 本登録時は「合格した」、仮登録時は「受験（予定）の」に切り替え */}
+            {isOfficial ? '合格した入試区分' : '受験（予定）の入試区分'} <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={admissionType}
+            onChange={(e) => setAdmissionType(e.target.value)}
+            className="w-full p-2 border rounded-lg bg-white"
+            required
+            disabled={!department}
+          >
+            <option value="" disabled>
+              {!faculty
+                ? '先に学部を選択してください'
+                : !department
+                  ? '先に学科を選択してください'
+                  : '選択してください'}
+            </option>
+            {currentOptions.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
+        </div>
+      </section>
+
+      {/* 2. 本登録モードのときだけ予約枠を表示する */}
       {isOfficial && (
-        <section className="mb-6 rounded-xl bg-white p-4 shadow-sm">
-          <h2 className="mb-3 font-semibold text-gray-700">1. ご希望の日時を選択</h2>
+        <section className="mb-6 rounded-xl bg-white p-4 shadow-sm animate-fade-in">
+          <h2 className="mb-1 font-semibold text-gray-700">2. ご希望の日時を選択 <span className="text-red-500">*</span></h2>
+
+          <p className="text-xs text-red-500 mb-3 font-medium">
+            ※新規予約・日時の変更は前日の21:00までです。<br />
+            （やむを得ないキャンセルは直前まで可能です）
+          </p>
+
           {loading ? (
             <p className="text-sm text-gray-500 text-center py-4">予約枠を読み込み中...</p>
           ) : slots.length === 0 ? (
@@ -300,36 +464,9 @@ function HomeContent() {
         </section>
       )}
 
+      {/* 3. 来場者情報の入力（名前やメアドは本登録のみ出現） */}
       <section className="mb-6 rounded-xl bg-white p-4 shadow-sm">
-        <h2 className="mb-4 font-semibold text-gray-700 border-b pb-2">2. 来場者情報の入力</h2>
-
-        {/* 🌟 本登録のときだけ名前・ふりがな・電話番号・メールアドレスを表示 */}
-        {isOfficial && (
-          <>
-            <div className="mb-4">
-              <label className="block text-sm font-bold mb-1 text-gray-600">お名前 <span className="text-red-500">*</span></label>
-              <div className="grid grid-cols-2 gap-2">
-                <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="山田" className="w-full p-2 border rounded-lg" required />
-                <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="太郎" className="w-full p-2 border rounded-lg" required />
-              </div>
-            </div>
-            <div className="mb-4">
-              <label className="block text-sm font-bold mb-1 text-gray-600">ふりがな <span className="text-red-500">*</span></label>
-              <div className="grid grid-cols-2 gap-2">
-                <input type="text" value={lastNameKana} onChange={(e) => setLastNameKana(e.target.value)} placeholder="やまだ" className="w-full p-2 border rounded-lg" required />
-                <input type="text" value={firstNameKana} onChange={(e) => setFirstNameKana(e.target.value)} placeholder="たろう" className="w-full p-2 border rounded-lg" required />
-              </div>
-            </div>
-            <div className="mb-4">
-              <label className="block text-sm font-bold mb-1 text-gray-600">電話番号 <span className="text-red-500">*</span></label>
-              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="090-1234-5678" className="w-full p-2 border rounded-lg" required />
-            </div>
-            <div className="mb-4">
-              <label className="block text-sm font-bold mb-1 text-gray-600">メールアドレス <span className="text-red-500">*</span></label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@yamanashi.ac.jp" className="w-full p-2 border rounded-lg" required />
-            </div>
-          </>
-        )}
+        <h2 className="mb-4 font-semibold text-gray-700 border-b pb-2">{isOfficial ? '3. 来場者情報の入力' : '2. 追加アンケート'}</h2>
 
         <div className="mb-4">
           <label className="block text-sm font-bold mb-1 text-gray-600">お住まいの都道府県 <span className="text-red-500">*</span></label>
@@ -339,58 +476,77 @@ function HomeContent() {
           </select>
         </div>
 
-        {isOfficial && (
-          <>
+        {isOfficial ? (
+          <div className="animate-fade-in">
             <div className="mb-4">
               <label className="block text-sm font-bold mb-1 text-gray-600">市区町村 <span className="text-red-500">*</span></label>
               <input type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder="甲府市武田" className="w-full p-2 border rounded-lg" required />
             </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-bold mb-1 text-gray-600">お名前 <span className="text-red-500">*</span></label>
+              <div className="grid grid-cols-2 gap-2">
+                <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="山田" className="w-full p-2 border rounded-lg" required />
+                <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="太郎" className="w-full p-2 border rounded-lg" required />
+              </div>
+            </div>
+
+            {/* ふりがなの入力欄（エラー時に赤くする処理を追加） */}
+            <div className="mb-4">
+              <label className="block text-sm font-bold mb-1 text-gray-600">ふりがな <span className="text-red-500">*</span></label>
+              <div className="grid grid-cols-2 gap-2">
+                <input type="text" value={lastNameKana} onChange={(e) => setLastNameKana(e.target.value)} placeholder="やまだ" className={`w-full p-2 border rounded-lg ${lastNameKana && !isHiragana(lastNameKana) ? 'border-red-500 bg-red-50' : ''}`} required />
+                <input type="text" value={firstNameKana} onChange={(e) => setFirstNameKana(e.target.value)} placeholder="たろう" className={`w-full p-2 border rounded-lg ${firstNameKana && !isHiragana(firstNameKana) ? 'border-red-500 bg-red-50' : ''}`} required />
+              </div>
+              {((lastNameKana && !isHiragana(lastNameKana)) || (firstNameKana && !isHiragana(firstNameKana))) && (
+                <p className="text-xs text-red-500 mt-1">※ふりがなは「ひらがな」で入力してください</p>
+              )}
+            </div>
+
+            {/* 電話番号の入力欄（エラー時に赤くする処理を追加） */}
+            <div className="mb-4">
+              <label className="block text-sm font-bold mb-1 text-gray-600">電話番号 <span className="text-red-500">*</span></label>
+              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="090-1234-5678" className={`w-full p-2 border rounded-lg ${phone && !isValidPhone(phone) ? 'border-red-500 bg-red-50' : ''}`} required />
+              {phone && !isValidPhone(phone) && (
+                <p className="text-xs text-red-500 mt-1">※正しい電話番号を半角で入力してください</p>
+              )}
+            </div>
+
+            {/* メールアドレスの入力欄（エラー時に赤くする処理を追加） */}
+            <div className="mb-4">
+              <label className="block text-sm font-bold mb-1 text-gray-600">メールアドレス <span className="text-red-500">*</span></label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@yamanashi.ac.jp" className={`w-full p-2 border rounded-lg ${email && !isValidEmail(email) ? 'border-red-500 bg-red-50' : ''}`} required />
+              {email && !isValidEmail(email) && (
+                <p className="text-xs text-red-500 mt-1">※正しいメールアドレスを半角で入力してください</p>
+              )}
+            </div>
+
             <div className="mb-4">
               <label className="block text-sm font-bold mb-1 text-gray-600">来場予定人数 <span className="text-red-500">*</span></label>
               <select value={attendeeCount} onChange={(e) => setAttendeeCount(Number(e.target.value))} className="w-full p-2 border rounded-lg bg-white" required>
                 {[1, 2, 3, 4, 5].map((num) => <option key={num} value={num}>{num} 名</option>)}
               </select>
             </div>
-          </>
+          </div>
+        ) : (
+          <div className="mb-2 animate-fade-in">
+            <label className="block text-sm font-bold mb-1 text-gray-600">現在の志望度</label>
+            <select value={motivationLevel} onChange={(e) => setMotivationLevel(e.target.value)} className="w-full p-2 border rounded-lg bg-white">
+              <option value="">選択肢にない・未定</option>
+              {MOTIVATION_LEVELS.map((level) => <option key={level} value={level}>{level}</option>)}
+            </select>
+          </div>
         )}
-
-        <div className="mb-4">
-          <label className="block text-sm font-bold mb-1 text-gray-600">興味のある学部 <span className="text-red-500">*</span></label>
-          <select value={faculty} onChange={handleFacultyChange} className="w-full p-2 border rounded-lg bg-white" required>
-            <option value="" disabled>選択してください</option>
-            {FACULTIES.map((fac) => <option key={fac} value={fac}>{fac}</option>)}
-          </select>
-        </div>
-        <div className="mb-4">
-          <label className="block text-sm font-bold mb-1 text-gray-600">興味のある学科 <span className="text-red-500">*</span></label>
-          <select value={department} onChange={(e) => setDepartment(e.target.value)} className="w-full p-2 border rounded-lg bg-white" required disabled={!faculty}>
-            <option value="" disabled>{faculty ? "選択してください" : "先に学部を選択してください"}</option>
-            {faculty && (FACULTY_DEPARTMENT_MAP[faculty] ?? []).map((dep) => <option key={dep} value={dep}>{dep}</option>)}
-          </select>
-        </div>
-        <div className="mb-4">
-          <label className="block text-sm font-bold mb-1 text-gray-600">検討中の入試区分</label>
-          <select value={admissionType} onChange={(e) => setAdmissionType(e.target.value)} className="w-full p-2 border rounded-lg bg-white">
-            <option value="">選択肢にない・未定</option>
-            {ADMISSION_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
-          </select>
-        </div>
-        <div className="mb-2">
-          <label className="block text-sm font-bold mb-1 text-gray-600">現在の志望度</label>
-          <select value={motivationLevel} onChange={(e) => setMotivationLevel(e.target.value)} className="w-full p-2 border rounded-lg bg-white">
-            <option value="">選択肢にない・未定</option>
-            {MOTIVATION_LEVELS.map((level) => <option key={level} value={level}>{level}</option>)}
-          </select>
-        </div>
       </section>
 
+      {/* 画面下部に固定される送信ボタン */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-lg z-50">
         <button
           disabled={!isFormValid || isSubmitting}
           onClick={handleReserve}
           className={`w-full rounded-xl py-4 text-center font-bold text-white transition-all ${isFormValid && !isSubmitting ? 'bg-green-600 hover:bg-green-700 active:scale-95 shadow-md' : 'bg-gray-300 cursor-not-allowed'}`}
         >
-          {isSubmitting ? '予約を送信中...' : isFormValid ? `この内容で${currentStatusText}を確定する` : '日時と必要事項を入力してください'}
+          {isSubmitting ? '予約を送信中...' : isFormValid ? `この内容で${currentStatusText}を確定する` : '必要事項を正しく入力してください'}
         </button>
       </div>
       <div className="h-24"></div>
