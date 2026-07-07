@@ -2,7 +2,6 @@
 import { supabase } from '../../supabase';
 import { useEffect, useState, Suspense } from 'react';
 import { Slot, FACULTIES } from '../../data/options';
-import { useRouter } from 'next/navigation'; // 🌟 画面遷移用のルーターを追加
 
 const generateTimeOptions = () => {
     const options = [];
@@ -38,7 +37,6 @@ interface Reservation {
 }
 
 function AdminContent() {
-    const router = useRouter(); // 🌟 追加
     const [session, setSession] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'users' | 'slots' | 'reception'>('users'); // qrを削除
@@ -408,8 +406,8 @@ function AdminContent() {
                 <button onClick={() => setActiveTab('reception')} className={`whitespace-nowrap px-4 py-2.5 font-bold text-sm transition-all border-b-2 ${activeTab === 'reception' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
                     📋 受付表（当日用）
                 </button>
-                {/* 🌟 修正：クリックしたら別ページ（/admin/scanner）に飛ぶように変更 */}
-                <button onClick={() => router.push('/admin/scanner')} className={`whitespace-nowrap px-4 py-2.5 font-bold text-sm transition-all border-b-2 border-transparent text-gray-500 hover:text-gray-700`}>
+                {/* 🌟 修正：クリックしたら新しいタブの別ページ（/admin/scanner）に飛ぶように変更 */}
+                <button onClick={() => window.open('/admin/scanner', '_blank')} className={`whitespace-nowrap px-4 py-2.5 font-bold text-sm transition-all border-b-2 border-transparent text-gray-500 hover:text-gray-700`}>
                     📷 QR受付
                 </button>
             </div>
@@ -470,7 +468,7 @@ function AdminContent() {
                                         <tr key={res.id} className="hover:bg-gray-50 transition-colors">
                                             <td className="p-3">
                                                 <span className={`px-2 py-1 rounded-md text-xs font-bold ${res.status === '受付済' ? 'bg-green-100 text-green-700' :
-                                                        res.status === '本登録' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'
+                                                    res.status === '本登録' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'
                                                     }`}>
                                                     {res.status}
                                                 </span>

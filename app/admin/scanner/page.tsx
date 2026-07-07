@@ -2,10 +2,8 @@
 import { supabase } from '../../../supabase';
 import { useEffect, useState, Suspense } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
-import { useRouter } from 'next/navigation';
 
 function ScannerContent() {
-    const router = useRouter();
     const [session, setSession] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [isScanning, setIsScanning] = useState(false);
@@ -72,12 +70,6 @@ function ScannerContent() {
             <main className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
                 <div className="bg-white p-8 rounded-2xl shadow-md w-full max-w-sm text-center">
                     <p className="text-red-500 font-bold mb-4">⚠️ 受付を行うには管理者ログインが必要です</p>
-                    <button
-                        onClick={() => router.push('/admin')}
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-lg transition-all"
-                    >
-                        管理画面へ進んでログイン
-                    </button>
                 </div>
             </main>
         );
@@ -85,11 +77,8 @@ function ScannerContent() {
 
     return (
         <main className="min-h-screen bg-gray-100 p-6 font-sans text-gray-800">
-            <header className="mb-6 flex justify-between items-center bg-white p-4 rounded-xl shadow-sm max-w-lg mx-auto">
+            <header className="mb-6 flex justify-center items-center bg-white p-4 rounded-xl shadow-sm max-w-lg mx-auto">
                 <h1 className="text-xl font-bold text-gray-900">📷 QRコード受付</h1>
-                <button onClick={() => router.push('/admin')} className="bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-bold px-4 py-2 rounded-lg transition-all">
-                    戻る
-                </button>
             </header>
 
             <section className="bg-white rounded-xl shadow-sm overflow-hidden p-6 max-w-lg mx-auto">
