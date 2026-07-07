@@ -2,12 +2,14 @@
 import { supabase } from '../../../supabase';
 import { useEffect, useState, Suspense } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
+import { tryCloseWindow } from '../../lib/close';
 // 🌟 useRouter は不要になったので削除しました！
 
 function ScannerContent() {
     const [session, setSession] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [isScanning, setIsScanning] = useState(false);
+    const [closeHint, setCloseHint] = useState(false); // 閉じるボタンが効かない環境向け案内
 
     const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
 
@@ -79,11 +81,16 @@ function ScannerContent() {
                     <p className="text-sm text-gray-500 mb-6">管理画面から再度「QR受付」を開き直してください。</p>
                     {/* 🌟 router.push ではなく、タブを閉じる処理に変更 */}
                     <button
-                        onClick={() => window.close()}
+                        onClick={() => tryCloseWindow(() => setCloseHint(true))}
                         className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2.5 px-6 rounded-lg transition-all w-full"
                     >
                         このタブを閉じる
                     </button>
+                    {closeHint && (
+                        <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                            このタブは自動で閉じられませんでした。ブラウザの「×」ボタンで閉じてください。
+                        </p>
+                    )}
                 </div>
             </main>
         );
