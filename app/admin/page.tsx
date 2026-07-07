@@ -2,7 +2,7 @@
 import { supabase } from '../../supabase';
 import { useEffect, useState, Suspense } from 'react';
 import { Slot, FACULTIES } from '../../data/options';
-import { Scanner } from '@yudiel/react-qr-scanner';
+import { useRouter } from 'next/navigation'; // 🌟 画面遷移用のルーターを追加
 
 const generateTimeOptions = () => {
     const options = [];
@@ -38,9 +38,10 @@ interface Reservation {
 }
 
 function AdminContent() {
+    const router = useRouter(); // 🌟 追加
     const [session, setSession] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'users' | 'slots' | 'reception' | 'qr'>('users');
+    const [activeTab, setActiveTab] = useState<'users' | 'slots' | 'reception'>('users'); // qrを削除
 
     const [loginEmail, setLoginEmail] = useState('');
     const [loginPassword, setLoginPassword] = useState('');
@@ -65,9 +66,6 @@ function AdminContent() {
     const [isAssigning, setIsAssigning] = useState(false);
 
     const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>({ key: 'created_at', direction: 'desc' });
-
-    // 🌟 QRスキャナー用のState
-    const [isScanning, setIsScanning] = useState(false);
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -296,55 +294,6 @@ function AdminContent() {
         }
     };
 
-    // 🌟 QRコードを読み取ったときの処理
-    const handleScanQR = async (text: string) => {
-        // 重複実行の防止
-        if (!text || isScanning) return;
-        setIsScanning(true);
-
-        try {
-            // URLから「id=〇〇」の部分だけを抽出
-            let targetId = text;
-            if (text.includes('id=')) {
-                try {
-                    const urlObj = new URL(text);
-                    targetId = urlObj.searchParams.get('id') || text;
-                } catch {
-                    targetId = text.split('id=')[1]?.split('&')[0] || text;
-                }
-            }
-
-            // DBから該当予約を検索
-            const { data, error } = await supabase.from('reservations').select('*').eq('id', targetId).maybeSingle();
-
-            if (error || !data) {
-                alert('❌ 無効なQRコードです（データが見つかりません）');
-                setTimeout(() => setIsScanning(false), 2000);
-                return;
-            }
-
-            if (data.status === '受付済') {
-                alert(`⚠️ すでに受付済みです\n氏名: ${data.last_name} ${data.first_name}`);
-            } else if (data.status === '仮登録') {
-                alert(`❌ 本登録が完了していません\n氏名: ${data.line_user_name || '未入力'}`);
-            } else {
-                // 受付済みに更新
-                const { error: updateError } = await supabase.from('reservations').update({ status: '受付済' }).eq('id', targetId);
-                if (updateError) throw updateError;
-
-                alert(`✅ 受付完了！\n氏名: ${data.last_name} ${data.first_name}\n人数: ${data.attendee_count}名\n班: ${data.group_name || '未定'}`);
-
-                // ローカル状態も更新（一覧や受付表タブにも即座に反映される）
-                setReservations(prev => prev.map(res => res.id === targetId ? { ...res, status: '受付済' } : res));
-            }
-        } catch (err: any) {
-            alert('読み取りエラー: ' + err.message);
-        }
-
-        // 3秒後に次のQRコードを読み取れるようにする
-        setTimeout(() => setIsScanning(false), 3000);
-    };
-
     const requestSort = (key: string) => {
         let direction: 'asc' | 'desc' = 'asc';
         if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -459,49 +408,11 @@ function AdminContent() {
                 <button onClick={() => setActiveTab('reception')} className={`whitespace-nowrap px-4 py-2.5 font-bold text-sm transition-all border-b-2 ${activeTab === 'reception' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
                     📋 受付表（当日用）
                 </button>
-                {/* 🌟 追加：QR読取タブ */}
-                <button onClick={() => setActiveTab('qr')} className={`whitespace-nowrap px-4 py-2.5 font-bold text-sm transition-all border-b-2 ${activeTab === 'qr' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                {/* 🌟 修正：クリックしたら別ページ（/admin/scanner）に飛ぶように変更 */}
+                <button onClick={() => router.push('/admin/scanner')} className={`whitespace-nowrap px-4 py-2.5 font-bold text-sm transition-all border-b-2 border-transparent text-gray-500 hover:text-gray-700`}>
                     📷 QR受付
                 </button>
             </div>
-
-            {/* 🌟 0. QR受付タブ（カメラ） */}
-            {activeTab === 'qr' && (
-                <section className="bg-white rounded-xl shadow-sm overflow-hidden p-6 max-w-lg mx-auto">
-                    <h2 className="text-xl font-bold text-gray-800 mb-2 text-center">📱 QRコード受付</h2>
-                    <p className="text-sm text-gray-500 text-center mb-6">
-                        学生のスマホに表示された受付票のQRコードを枠内にかざしてください。
-                    </p>
-
-                    <div className="rounded-2xl overflow-hidden border-4 border-blue-50 bg-gray-900 relative shadow-inner">
-                        <Scanner
-                            onScan={(result) => {
-                                if (result && result.length > 0) {
-                                    handleScanQR(result[0].rawValue);
-                                }
-                            }}
-                            onError={(error) => console.log(error?.message)}
-                        />
-
-                        {/* スキャン中のアニメーション */}
-                        {isScanning && (
-                            <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-10 backdrop-blur-sm">
-                                <div className="text-blue-600 font-bold text-lg flex items-center gap-2">
-                                    <svg className="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    処理中...
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="mt-6 text-center text-sm text-gray-500">
-                        読取に成功すると画面に結果が表示され、<br />3秒後に次のスキャンが可能になります。
-                    </div>
-                </section>
-            )}
 
             {/* 🌟 1. 登録者一覧タブ */}
             {activeTab === 'users' && (
@@ -559,7 +470,7 @@ function AdminContent() {
                                         <tr key={res.id} className="hover:bg-gray-50 transition-colors">
                                             <td className="p-3">
                                                 <span className={`px-2 py-1 rounded-md text-xs font-bold ${res.status === '受付済' ? 'bg-green-100 text-green-700' :
-                                                    res.status === '本登録' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'
+                                                        res.status === '本登録' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'
                                                     }`}>
                                                     {res.status}
                                                 </span>
