@@ -10,7 +10,7 @@ function CheckinContent() {
     const [session, setSession] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [studentInfo, setStudentInfo] = useState<any>(null);
-    const [checkinStatus, setCheckinStatus] = useState<'success' | 'already' | 'error' | null>(null);
+    const [checkinStatus, setCheckinStatus] = useState<'success' | 'already' | 'unregistered' | 'error' | null>(null);
 
     // 1. ログイン状態の監視
     useEffect(() => {
@@ -43,6 +43,9 @@ function CheckinContent() {
             // すでに受付済みの場合は二重更新しない
             if (resData.status === '受付済') {
                 setCheckinStatus('already');
+            } else if (resData.status === '仮登録') {
+                // 本登録が済んでいない（仮登録の）人は受付できない。スキャナー経路と挙動を揃える。
+                setCheckinStatus('unregistered');
             } else {
                 // ステータスを「受付済」に更新
                 const { error: updateError } = await supabase
@@ -95,6 +98,14 @@ function CheckinContent() {
                     <div className="mb-6">
                         <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center text-4xl mx-auto mb-3">!</div>
                         <h1 className="text-xl font-bold text-amber-600">既に受付済みのチケットです</h1>
+                    </div>
+                )}
+
+                {checkinStatus === 'unregistered' && (
+                    <div className="mb-6">
+                        <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-4xl mx-auto mb-3">!</div>
+                        <h1 className="text-xl font-bold text-red-600">本登録が完了していません</h1>
+                        <p className="text-sm text-gray-500 mt-2">（仮登録の状態です）</p>
                     </div>
                 )}
 
