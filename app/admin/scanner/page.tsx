@@ -2,17 +2,15 @@
 import { supabase } from '../../../supabase';
 import { useEffect, useState, Suspense } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
-import { useRouter } from 'next/navigation';
+// 🌟 useRouter は不要になったので削除しました！
 
 function ScannerContent() {
-    const router = useRouter();
     const [session, setSession] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [isScanning, setIsScanning] = useState(false);
 
     const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
 
-    // 🌟 受付結果画面用のStateを追加
     const [scanResult, setScanResult] = useState<'success' | 'already' | 'unregistered' | 'error' | null>(null);
     const [scannedStudent, setScannedStudent] = useState<any>(null);
 
@@ -60,7 +58,6 @@ function ScannerContent() {
             setScanResult('error');
         }
 
-        // 🌟 3秒後に結果画面を消して、再びカメラに戻す
         setTimeout(() => {
             setScanResult(null);
             setScannedStudent(null);
@@ -79,11 +76,13 @@ function ScannerContent() {
             <main className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
                 <div className="bg-white p-8 rounded-2xl shadow-md w-full max-w-sm text-center">
                     <p className="text-red-500 font-bold mb-4">⚠️ 受付を行うには管理者ログインが必要です</p>
+                    <p className="text-sm text-gray-500 mb-6">管理画面から再度「QR受付」を開き直してください。</p>
+                    {/* 🌟 router.push ではなく、タブを閉じる処理に変更 */}
                     <button
-                        onClick={() => router.push('/admin')}
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-lg transition-all"
+                        onClick={() => window.close()}
+                        className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2.5 px-6 rounded-lg transition-all w-full"
                     >
-                        管理画面へ進んでログイン
+                        このタブを閉じる
                     </button>
                 </div>
             </main>
@@ -92,13 +91,11 @@ function ScannerContent() {
 
     return (
         <main className="min-h-screen bg-gray-100 flex flex-col p-6 font-sans text-gray-800">
-            {/* ヘッダー部分は常に表示 */}
             <header className="mb-6 flex justify-center items-center bg-white p-4 rounded-xl shadow-sm max-w-lg w-full mx-auto">
                 <h1 className="text-xl font-bold text-gray-900">📷 QRコード受付システム</h1>
             </header>
 
             <div className="flex-1 flex flex-col items-center justify-center">
-                {/* 🌟 scanResult が null の時だけカメラを表示 */}
                 {!scanResult ? (
                     <section className="bg-white rounded-xl shadow-sm overflow-hidden p-6 w-full max-w-lg">
                         <div className="flex justify-between items-start mb-4 gap-4">
@@ -130,7 +127,6 @@ function ScannerContent() {
                         </div>
                     </section>
                 ) : (
-                    /* 🌟 QRを読み取った後は、こちらの結果画面に切り替わる */
                     <section className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 text-center border-t-8 border-blue-600 animate-fade-in">
 
                         {scanResult === 'success' && (
@@ -163,7 +159,6 @@ function ScannerContent() {
                             </div>
                         )}
 
-                        {/* エラー以外の時は、読み取った学生の情報を表示 */}
                         {scannedStudent && scanResult !== 'error' && (
                             <div className="bg-gray-50 rounded-xl p-4 text-left border border-gray-100 space-y-3 text-sm">
                                 <div>
