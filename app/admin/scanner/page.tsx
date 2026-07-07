@@ -2,14 +2,19 @@
 import { supabase } from '../../../supabase';
 import { useEffect, useState, Suspense } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
+import { useRouter } from 'next/navigation';
 
 function ScannerContent() {
+    const router = useRouter();
     const [session, setSession] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [isScanning, setIsScanning] = useState(false);
 
-    // 🌟 カメラの向きを管理するState（デフォルトを 'user' = 内カメ に設定）
     const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+
+    // 🌟 受付結果画面用のStateを追加
+    const [scanResult, setScanResult] = useState<'success' | 'already' | 'unregistered' | 'error' | null>(null);
+    const [scannedStudent, setScannedStudent] = useState<any>(null);
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -36,29 +41,33 @@ function ScannerContent() {
             const { data, error } = await supabase.from('reservations').select('*').eq('id', targetId).maybeSingle();
 
             if (error || !data) {
-                alert('❌ 無効なQRコードです（データが見つかりません）');
-                setTimeout(() => setIsScanning(false), 2000);
-                return;
-            }
-
-            if (data.status === '受付済') {
-                alert(`⚠️ すでに受付済みです\n氏名: ${data.last_name} ${data.first_name}`);
-            } else if (data.status === '仮登録') {
-                alert(`❌ 本登録が完了していません\n氏名: ${data.line_user_name || '未入力'}`);
+                setScanResult('error');
             } else {
-                const { error: updateError } = await supabase.from('reservations').update({ status: '受付済' }).eq('id', targetId);
-                if (updateError) throw updateError;
+                setScannedStudent(data);
 
-                alert(`✅ 受付完了！\n氏名: ${data.last_name} ${data.first_name}\n人数: ${data.attendee_count}名\n班: ${data.group_name || '未定'}`);
+                if (data.status === '受付済') {
+                    setScanResult('already');
+                } else if (data.status === '仮登録') {
+                    setScanResult('unregistered');
+                } else {
+                    const { error: updateError } = await supabase.from('reservations').update({ status: '受付済' }).eq('id', targetId);
+                    if (updateError) throw updateError;
+                    setScanResult('success');
+                }
             }
         } catch (err: any) {
-            alert('読み取りエラー: ' + err.message);
+            console.error('読み取りエラー:', err.message);
+            setScanResult('error');
         }
 
-        setTimeout(() => setIsScanning(false), 3000);
+        // 🌟 3秒後に結果画面を消して、再びカメラに戻す
+        setTimeout(() => {
+            setScanResult(null);
+            setScannedStudent(null);
+            setIsScanning(false);
+        }, 3000);
     };
 
-    // 🌟 カメラを切り替える関数
     const toggleCamera = () => {
         setFacingMode(prev => prev === 'user' ? 'environment' : 'user');
     };
@@ -70,61 +79,128 @@ function ScannerContent() {
             <main className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
                 <div className="bg-white p-8 rounded-2xl shadow-md w-full max-w-sm text-center">
                     <p className="text-red-500 font-bold mb-4">⚠️ 受付を行うには管理者ログインが必要です</p>
+                    <button
+                        onClick={() => router.push('/admin')}
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-lg transition-all"
+                    >
+                        管理画面へ進んでログイン
+                    </button>
                 </div>
             </main>
         );
     }
 
     return (
-        <main className="min-h-screen bg-gray-100 p-6 font-sans text-gray-800">
-            <header className="mb-6 flex justify-center items-center bg-white p-4 rounded-xl shadow-sm max-w-lg mx-auto">
-                <h1 className="text-xl font-bold text-gray-900">📷 QRコード受付</h1>
+        <main className="min-h-screen bg-gray-100 flex flex-col p-6 font-sans text-gray-800">
+            {/* ヘッダー部分は常に表示 */}
+            <header className="mb-6 flex justify-center items-center bg-white p-4 rounded-xl shadow-sm max-w-lg w-full mx-auto">
+                <h1 className="text-xl font-bold text-gray-900">📷 QRコード受付システム</h1>
             </header>
 
-            <section className="bg-white rounded-xl shadow-sm overflow-hidden p-6 max-w-lg mx-auto">
-
-                {/* 🌟 カメラ切り替えボタンと案内テキスト */}
-                <div className="flex justify-between items-start mb-4 gap-4">
-                    <p className="text-sm text-gray-500">
-                        学生のスマホに表示された受付票のQRコードを枠内にかざしてください。
-                    </p>
-                    <button
-                        onClick={toggleCamera}
-                        className="flex-shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors border shadow-sm flex items-center gap-1"
-                    >
-                        🔄 {facingMode === 'user' ? '内カメ使用中' : '外カメ使用中'}
-                    </button>
-                </div>
-
-                <div className="rounded-2xl overflow-hidden border-4 border-blue-50 bg-gray-900 relative shadow-inner">
-                    <Scanner
-                        key={facingMode} // 🌟 カメラ切り替え時にコンポーネントを再起動させるためのKey
-                        constraints={{ facingMode: facingMode }} // 🌟 ここで内カメ（user）か外カメ（environment）を指定
-                        onScan={(result) => {
-                            if (result && result.length > 0) {
-                                handleScanQR(result[0].rawValue);
-                            }
-                        }}
-                        onError={(error) => console.log(error?.message)}
-                    />
-
-                    {isScanning && (
-                        <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-10 backdrop-blur-sm">
-                            <div className="text-blue-600 font-bold text-lg flex items-center gap-2">
-                                <svg className="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                処理中...
-                            </div>
+            <div className="flex-1 flex flex-col items-center justify-center">
+                {/* 🌟 scanResult が null の時だけカメラを表示 */}
+                {!scanResult ? (
+                    <section className="bg-white rounded-xl shadow-sm overflow-hidden p-6 w-full max-w-lg">
+                        <div className="flex justify-between items-start mb-4 gap-4">
+                            <p className="text-sm text-gray-500">
+                                学生のスマホに表示された受付票のQRコードを枠内にかざしてください。
+                            </p>
+                            <button
+                                onClick={toggleCamera}
+                                className="flex-shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors border shadow-sm flex items-center gap-1"
+                            >
+                                🔄 {facingMode === 'user' ? '内カメ使用中' : '外カメ使用中'}
+                            </button>
                         </div>
-                    )}
-                </div>
 
-                <div className="mt-6 text-center text-sm text-gray-500">
-                    読取に成功すると画面に結果が表示され、<br />3秒後に次のスキャンが可能になります。
-                </div>
-            </section>
+                        <div className="rounded-2xl overflow-hidden border-4 border-blue-50 bg-gray-900 relative shadow-inner">
+                            <Scanner
+                                key={facingMode}
+                                constraints={{ facingMode: facingMode }}
+                                onScan={(result) => {
+                                    if (result && result.length > 0) {
+                                        handleScanQR(result[0].rawValue);
+                                    }
+                                }}
+                                onError={(error) => console.log(error?.message)}
+                            />
+                        </div>
+                        <div className="mt-6 text-center text-sm font-bold text-blue-600 animate-pulse">
+                            スキャン待機中...
+                        </div>
+                    </section>
+                ) : (
+                    /* 🌟 QRを読み取った後は、こちらの結果画面に切り替わる */
+                    <section className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 text-center border-t-8 border-blue-600 animate-fade-in">
+
+                        {scanResult === 'success' && (
+                            <div className="mb-6">
+                                <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-4xl mx-auto mb-3">✓</div>
+                                <h1 className="text-2xl font-bold text-green-600">受付が完了しました</h1>
+                            </div>
+                        )}
+
+                        {scanResult === 'already' && (
+                            <div className="mb-6">
+                                <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center text-4xl mx-auto mb-3">!</div>
+                                <h1 className="text-xl font-bold text-amber-600">既に受付済みのチケットです</h1>
+                            </div>
+                        )}
+
+                        {scanResult === 'unregistered' && (
+                            <div className="mb-6">
+                                <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-4xl mx-auto mb-3">!</div>
+                                <h1 className="text-xl font-bold text-red-600">本登録が完了していません</h1>
+                                <p className="text-sm text-gray-500 mt-2">（仮登録の状態です）</p>
+                            </div>
+                        )}
+
+                        {scanResult === 'error' && (
+                            <div className="mb-6">
+                                <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-4xl mx-auto mb-3">×</div>
+                                <h1 className="text-xl font-bold text-red-600">無効なチケットです</h1>
+                                <p className="text-sm text-gray-500 mt-2">予約データが存在しないか、URLが不正です。</p>
+                            </div>
+                        )}
+
+                        {/* エラー以外の時は、読み取った学生の情報を表示 */}
+                        {scannedStudent && scanResult !== 'error' && (
+                            <div className="bg-gray-50 rounded-xl p-4 text-left border border-gray-100 space-y-3 text-sm">
+                                <div>
+                                    <span className="text-gray-400 font-semibold block text-xs">氏名</span>
+                                    <p className="text-lg font-bold text-gray-900">
+                                        {scannedStudent.last_name ? `${scannedStudent.last_name} ${scannedStudent.first_name}` : scannedStudent.line_user_name || '未入力'}
+                                    </p>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <span className="text-gray-400 font-semibold block text-xs">人数</span>
+                                        <p className="font-bold text-xl text-blue-600">{scannedStudent.attendee_count} 名</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-400 font-semibold block text-xs">班</span>
+                                        <p className="font-bold text-xl text-indigo-600">{scannedStudent.group_name || '未定'}</p>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-200">
+                                    <div>
+                                        <span className="text-gray-400 font-semibold block text-xs">学部</span>
+                                        <p className="font-medium text-gray-800">{scannedStudent.faculty}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-400 font-semibold block text-xs">学科・コース</span>
+                                        <p className="font-medium text-gray-800">{scannedStudent.department}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="mt-6 text-sm font-bold text-gray-400">
+                            3秒後にカメラに戻ります...
+                        </div>
+                    </section>
+                )}
+            </div>
         </main>
     );
 }
