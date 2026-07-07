@@ -155,7 +155,7 @@ function HomeContent() {
   useEffect(() => {
     const initApp = async () => {
       try {
-        await liff.init({ liffId: '2010515590-mKz3DfbF' });
+        await liff.init({ liffId: '2010635082-iQHjYAvx' });
         if (!liff.isLoggedIn()) {
           liff.login();
         } else {
