@@ -10,6 +10,9 @@ function ScannerContent() {
     const [loading, setLoading] = useState(true);
     const [isScanning, setIsScanning] = useState(false);
 
+    // 🌟 カメラの向きを管理するState（デフォルトを 'user' = 内カメ に設定）
+    const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
@@ -57,6 +60,11 @@ function ScannerContent() {
         setTimeout(() => setIsScanning(false), 3000);
     };
 
+    // 🌟 カメラを切り替える関数
+    const toggleCamera = () => {
+        setFacingMode(prev => prev === 'user' ? 'environment' : 'user');
+    };
+
     if (loading) return <div className="p-8 text-center text-gray-500">システム起動中...</div>;
 
     if (!session) {
@@ -85,12 +93,24 @@ function ScannerContent() {
             </header>
 
             <section className="bg-white rounded-xl shadow-sm overflow-hidden p-6 max-w-lg mx-auto">
-                <p className="text-sm text-gray-500 text-center mb-6">
-                    学生のスマホに表示された受付票のQRコードを枠内にかざしてください。
-                </p>
+
+                {/* 🌟 カメラ切り替えボタンと案内テキスト */}
+                <div className="flex justify-between items-start mb-4 gap-4">
+                    <p className="text-sm text-gray-500">
+                        学生のスマホに表示された受付票のQRコードを枠内にかざしてください。
+                    </p>
+                    <button
+                        onClick={toggleCamera}
+                        className="flex-shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors border shadow-sm flex items-center gap-1"
+                    >
+                        🔄 {facingMode === 'user' ? '内カメ使用中' : '外カメ使用中'}
+                    </button>
+                </div>
 
                 <div className="rounded-2xl overflow-hidden border-4 border-blue-50 bg-gray-900 relative shadow-inner">
                     <Scanner
+                        key={facingMode} // 🌟 カメラ切り替え時にコンポーネントを再起動させるためのKey
+                        constraints={{ facingMode: facingMode }} // 🌟 ここで内カメ（user）か外カメ（environment）を指定
                         onScan={(result) => {
                             if (result && result.length > 0) {
                                 handleScanQR(result[0].rawValue);
