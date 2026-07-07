@@ -1,8 +1,7 @@
 "use client";
 import { supabase } from '../../../supabase';
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, Suspense, useRef } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
-// 🌟 useRouter は不要になったので削除しました！
 
 function ScannerContent() {
     const [session, setSession] = useState<any>(null);
@@ -13,6 +12,61 @@ function ScannerContent() {
 
     const [scanResult, setScanResult] = useState<'success' | 'already' | 'unregistered' | 'error' | null>(null);
     const [scannedStudent, setScannedStudent] = useState<any>(null);
+
+    // 読み取り成功時の「ピロリン♪」音を生成する関数
+    const playSuccessSound = () => {
+        try {
+            const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+            const ctx = new AudioContext();
+
+            // 最初の「ピ」の音（少し低め）
+            const osc1 = ctx.createOscillator();
+            const gain1 = ctx.createGain();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(880, ctx.currentTime);
+            gain1.gain.setValueAtTime(0.1, ctx.currentTime);
+            gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+            osc1.connect(gain1);
+            gain1.connect(ctx.destination);
+            osc1.start(ctx.currentTime);
+            osc1.stop(ctx.currentTime + 0.1);
+
+            // 続く「ロリン♪」の音（高め）
+            const osc2 = ctx.createOscillator();
+            const gain2 = ctx.createGain();
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(1760, ctx.currentTime + 0.1);
+            gain2.gain.setValueAtTime(0.1, ctx.currentTime + 0.1);
+            gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+            osc2.connect(gain2);
+            gain2.connect(ctx.destination);
+            osc2.start(ctx.currentTime + 0.1);
+            osc2.stop(ctx.currentTime + 0.4);
+        } catch (e) {
+            console.error("Audio API がサポートされていないか、エラーが発生しました", e);
+        }
+    };
+
+    // 読み取り失敗時の「ブブッ」音を生成する関数（おまけ）
+    const playErrorSound = () => {
+        try {
+            const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+            const ctx = new AudioContext();
+
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(150, ctx.currentTime);
+            gain.gain.setValueAtTime(0.1, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.3);
+        } catch (e) {
+            console.error("Audio error", e);
+        }
+    };
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -39,22 +93,28 @@ function ScannerContent() {
             const { data, error } = await supabase.from('reservations').select('*').eq('id', targetId).maybeSingle();
 
             if (error || !data) {
+                playErrorSound();
                 setScanResult('error');
             } else {
                 setScannedStudent(data);
 
                 if (data.status === '受付済') {
+                    playSuccessSound();
                     setScanResult('already');
                 } else if (data.status === '仮登録') {
+                    playErrorSound();
                     setScanResult('unregistered');
                 } else {
                     const { error: updateError } = await supabase.from('reservations').update({ status: '受付済' }).eq('id', targetId);
                     if (updateError) throw updateError;
+
+                    playSuccessSound();
                     setScanResult('success');
                 }
             }
         } catch (err: any) {
             console.error('読み取りエラー:', err.message);
+            playErrorSound();
             setScanResult('error');
         }
 
@@ -75,9 +135,8 @@ function ScannerContent() {
         return (
             <main className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
                 <div className="bg-white p-8 rounded-2xl shadow-md w-full max-w-sm text-center">
-                    <p className="text-red-500 font-bold mb-4">⚠️ 受付を行うには管理者ログインが必要です</p>
+                    <p className="text-red-500 font-bold mb-4">⚠ 受付を行うには管理者ログインが必要です</p>
                     <p className="text-sm text-gray-500 mb-6">管理画面から再度「QR受付」を開き直してください。</p>
-                    {/* 🌟 router.push ではなく、タブを閉じる処理に変更 */}
                     <button
                         onClick={() => window.close()}
                         className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2.5 px-6 rounded-lg transition-all w-full"
