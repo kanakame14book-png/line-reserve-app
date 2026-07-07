@@ -255,7 +255,10 @@ function HomeContent() {
     }
 
     const targetSlot = slots.find(s => s.id === selectedSlotId);
-    if (isOfficial && targetSlot && targetSlot.reservation_count !== undefined && targetSlot.reservation_count >= targetSlot.capacity) {
+    // 既に自分が同じ枠を予約済みの場合、再送信は upsert で更新されるだけで席は増えない。
+    // reservation_count には自分の予約も含まれるため、この場合は満席チェックを免除する。
+    const alreadyHoldsThisSlot = existingReservation?.slot_id === selectedSlotId;
+    if (isOfficial && !alreadyHoldsThisSlot && targetSlot && targetSlot.reservation_count !== undefined && targetSlot.reservation_count >= targetSlot.capacity) {
       alert('申し訳ありません。満席になってしまいました。別の時間をお選びください。');
       return;
     }

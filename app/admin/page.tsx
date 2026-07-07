@@ -67,32 +67,7 @@ function AdminContent() {
 
     const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>({ key: 'created_at', direction: 'desc' });
 
-    useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session);
-            if (session) {
-                fetchReservations();
-                fetchSlots();
-            } else {
-                setLoading(false);
-            }
-        });
-
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setSession(session);
-            if (session) {
-                fetchReservations();
-                fetchSlots();
-            } else {
-                setReservations([]);
-                setSlots([]);
-                setLoading(false);
-            }
-        });
-
-        return () => subscription.unsubscribe();
-    }, []);
-
+    // 🌟 useEffect のコールバックから参照するため、先に宣言しておく（宣言前アクセス回避）
     const fetchReservations = async () => {
         try {
             const { data, error } = await supabase
@@ -119,6 +94,32 @@ function AdminContent() {
             console.error('枠の取得エラー:', err.message);
         }
     };
+
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session);
+            if (session) {
+                fetchReservations();
+                fetchSlots();
+            } else {
+                setLoading(false);
+            }
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session);
+            if (session) {
+                fetchReservations();
+                fetchSlots();
+            } else {
+                setReservations([]);
+                setSlots([]);
+                setLoading(false);
+            }
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -344,6 +345,14 @@ function AdminContent() {
     const sortedFilteredReservations = sortReservations(filteredReservations);
     const sortedReceptionReservations = sortReservations(receptionReservations);
 
+    // 🌟 Issue #20対応：組数と来場人数を明確に区別するための集計
+    //   ・定員（capacity）＝ 組数で満席判定（1予約=1組=1枠）
+    //   ・合計人数 ＝ attendee_count の総和（当日の来場予定人数）
+    const sumAttendees = (list: Reservation[]) => list.reduce((sum, r) => sum + (r.attendee_count || 0), 0);
+    const totalReceptionAttendees = sumAttendees(sortedReceptionReservations);
+    const totalListAttendees = sumAttendees(sortedFilteredReservations);
+
+    // 🌟 ソート可能なテーブル見出し（TH）を作るための共通パーツ
     const SortableHeader = ({ label, sortKey, className = "p-3" }: { label: string, sortKey: string, className?: string }) => {
         const isActive = sortConfig?.key === sortKey;
         return (
@@ -418,8 +427,10 @@ function AdminContent() {
             {activeTab === 'users' && (
                 <section className="bg-white rounded-xl shadow-sm overflow-hidden">
                     <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                        <h2 className="font-semibold text-gray-700 whitespace-nowrap">
-                            登録者一覧 <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs ml-1">{sortedFilteredReservations.length}名</span>
+                        <h2 className="font-semibold text-gray-700 whitespace-nowrap flex items-center gap-1">
+                            登録者一覧
+                            <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs ml-1">{sortedFilteredReservations.length}組</span>
+                            <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-xs">合計 {totalListAttendees}名</span>
                         </h2>
 
                         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
@@ -516,8 +527,10 @@ function AdminContent() {
             {activeTab === 'reception' && (
                 <section className="bg-white rounded-xl shadow-sm overflow-hidden">
                     <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                        <h2 className="font-semibold text-gray-700 whitespace-nowrap">
-                            📋 当日受付表 <span className="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full text-xs ml-1">{sortedReceptionReservations.length}名</span>
+                        <h2 className="font-semibold text-gray-700 whitespace-nowrap flex items-center gap-1">
+                            📋 当日受付表
+                            <span className="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full text-xs ml-1">{sortedReceptionReservations.length}組</span>
+                            <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-xs">合計 {totalReceptionAttendees}名</span>
                         </h2>
 
                         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
@@ -646,8 +659,9 @@ function AdminContent() {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-bold text-gray-600 mb-1">定員（人数）</label>
+                                <label className="block text-sm font-bold text-gray-600 mb-1">定員（組数）</label>
                                 <input type="number" min="1" value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} className="w-full p-2 border rounded outline-none" required />
+                                <p className="text-xs text-gray-400 mt-1">※満席判定は「組数」で行います（1予約=1組。人数ではありません）</p>
                             </div>
 
                             <button type="submit" className={`w-full font-bold py-3 rounded-lg text-white transition-colors ${editingSlotId ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700'
@@ -669,6 +683,12 @@ function AdminContent() {
                                     const timeStr = dateObj.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
                                     const isCurrentEditing = editingSlotId === slot.id;
 
+                                    // 🌟 この枠の予約状況（組数で満席判定、人数は参考表示）Issue #20
+                                    const slotReservations = reservations.filter(r => r.slot_id === slot.id);
+                                    const bookedGroups = slotReservations.length;
+                                    const bookedPeople = sumAttendees(slotReservations);
+                                    const isFull = bookedGroups >= slot.capacity;
+
                                     return (
                                         <li key={slot.id} className={`flex flex-col p-4 border rounded-lg transition-all ${isCurrentEditing ? 'bg-amber-50/50 border-amber-300 ring-1 ring-amber-300/30' : 'hover:bg-gray-50'
                                             }`}>
@@ -680,7 +700,12 @@ function AdminContent() {
                                                             {slot.event_type}
                                                         </span>
                                                     </div>
-                                                    <p className="text-sm text-gray-500 mt-1">定員: {slot.capacity}名</p>
+                                                    <p className="text-sm text-gray-500 mt-1">
+                                                        定員: {slot.capacity}組
+                                                        <span className={`ml-2 font-medium ${isFull ? 'text-red-500' : 'text-gray-700'}`}>
+                                                            （予約 {bookedGroups}/{slot.capacity}組{isFull ? '・満席' : ''} / 合計 {bookedPeople}名）
+                                                        </span>
+                                                    </p>
                                                 </div>
 
                                                 <div className="flex items-center gap-2">
