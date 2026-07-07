@@ -3,6 +3,7 @@ import { supabase } from '../../../supabase';
 import { useEffect, useState, Suspense } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { tryCloseWindow } from '../../lib/close';
+import { QrTrademark } from '../../components/QrTrademark';
 // 🌟 useRouter は不要になったので削除しました！
 
 function ScannerContent() {
@@ -203,6 +204,9 @@ function ScannerContent() {
                     </section>
                 )}
             </div>
+            <footer className="mt-6 text-center">
+                <QrTrademark />
+            </footer>
         </main>
     );
 }

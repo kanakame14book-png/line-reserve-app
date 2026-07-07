@@ -3,6 +3,7 @@ import { supabase } from '../../../supabase';
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { tryCloseWindow } from '../../lib/close';
+import { QrTrademark } from '../../components/QrTrademark';
 
 function TicketContent() {
     const searchParams = useSearchParams();
@@ -136,6 +137,7 @@ function TicketContent() {
                     </div>
                     <p className="text-[10px] text-gray-400 tracking-widest">ID: {reservation.id}</p>
                     <p className="text-xs text-gray-500 mt-2 font-medium">当日はこのQRコードを受付にご提示ください</p>
+                    <QrTrademark className="mt-2" />
                 </div>
 
             </div>
