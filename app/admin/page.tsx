@@ -215,11 +215,11 @@ function AdminContent() {
     };
 
     const handleAssignGroups = async (slotId: string) => {
-        if (!confirm('この枠の本登録者を学部ごとに【A班・B班・C班】の3班に自動で振り分けます。\nよろしいですか？')) return;
+        if (!confirm('この枠の予約者を学部ごとに【A班・B班・C班】の3班に自動で振り分けます。\nよろしいですか？')) return;
 
         setIsAssigning(true);
         try {
-            const targetUsers = reservations.filter(res => res.slot_id === slotId && (res.status === '本登録' || res.status === '受付済'));
+            const targetUsers = reservations.filter(res => res.slot_id === slotId && (res.status === '予約' || res.status === '受付済'));
 
             if (targetUsers.length === 0) {
                 alert('この枠には対象者がいません。');
@@ -283,7 +283,7 @@ function AdminContent() {
     };
 
     const handleToggleCheckin = async (id: string, currentStatus: string) => {
-        const newStatus = currentStatus === '受付済' ? '本登録' : '受付済';
+        const newStatus = currentStatus === '受付済' ? '予約' : '受付済';
         try {
             const { error } = await supabase.from('reservations').update({ status: newStatus }).eq('id', id);
             if (error) throw error;
@@ -335,7 +335,7 @@ function AdminContent() {
     });
 
     const receptionReservations = reservations.filter(res => {
-        const isOfficialMember = res.status === '本登録' || res.status === '受付済';
+        const isOfficialMember = res.status === '予約' || res.status === '受付済';
         const matchSlot = receptionSlotId === 'all' || res.slot_id === receptionSlotId;
         return isOfficialMember && matchSlot;
     });
@@ -434,9 +434,9 @@ function AdminContent() {
                         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
                             <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="text-sm border rounded p-1.5 bg-white text-gray-600 outline-none">
                                 <option value="all">すべての状態</option>
-                                <option value="本登録">本登録のみ</option>
+                                <option value="予約">予約のみ</option>
                                 <option value="受付済">受付済のみ</option>
-                                <option value="仮登録">仮登録のみ</option>
+                                <option value="登録">登録のみ</option>
                             </select>
 
                             <select value={filterFaculty} onChange={(e) => setFilterFaculty(e.target.value)} className="text-sm border rounded p-1.5 bg-white text-gray-600 outline-none">
@@ -446,7 +446,7 @@ function AdminContent() {
 
                             <select value={filterSlotId} onChange={(e) => setFilterSlotId(e.target.value)} className="text-sm border rounded p-1.5 bg-white text-gray-600 outline-none max-w-[180px]">
                                 <option value="all">すべての日程</option>
-                                <option value="none">日程未選択 (仮登録等)</option>
+                                <option value="none">日程未選択 (登録等)</option>
                                 {slots.map(slot => (
                                     <option key={slot.id} value={slot.id}>{formatSlotTime(slot.id)}</option>
                                 ))}
@@ -479,7 +479,7 @@ function AdminContent() {
                                         <tr key={res.id} className="hover:bg-gray-50 transition-colors">
                                             <td className="p-3">
                                                 <span className={`px-2 py-1 rounded-md text-xs font-bold ${res.status === '受付済' ? 'bg-green-100 text-green-700' :
-                                                    res.status === '本登録' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'
+                                                    res.status === '予約' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'
                                                     }`}>
                                                     {res.status}
                                                 </span>
@@ -507,7 +507,7 @@ function AdminContent() {
                                                 <button
                                                     onClick={() => window.open(`/admin/ticket?id=${res.id}`, '_blank')}
                                                     className="bg-white border border-gray-200 text-gray-700 font-bold text-xs px-2.5 py-1.5 rounded hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm disabled:opacity-50"
-                                                    disabled={res.status === '仮登録'}
+                                                    disabled={res.status === '登録'}
                                                 >
                                                     🎫 受付票
                                                 </button>

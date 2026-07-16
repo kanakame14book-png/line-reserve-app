@@ -24,9 +24,9 @@ function HomeContent() {
   const [selectedSlotId, setSelectedSlotId] = useState<string>(''); // ユーザーが選んだ日時のID
   const [existingReservation, setExistingReservation] = useState<any>(null); // すでに予約済みかどうかのデータ
 
-  // モード管理：ここが true なら「本登録（合格後）」、false なら「仮登録」になる
+  // モード管理：ここが true なら「予約（合格後）」、false なら「登録」になる
   const [isOfficial, setIsOfficial] = useState<boolean>(false);
-  const currentStatusText = isOfficial ? '本登録' : '仮登録';
+  const currentStatusText = isOfficial ? '予約' : '登録';
 
   // フォームの入力項目を保存するためのState群
   const [faculty, setFaculty] = useState('');
@@ -76,7 +76,7 @@ function HomeContent() {
   // 2. 【自動切り替えロジック】 (useEffect)
   // =========================================================================
   useEffect(() => {
-    // 学部か入試区分のどちらかが空っぽなら、とりあえず「仮登録」にしておく
+    // 学部か入試区分のどちらかが空っぽなら、とりあえず「登録」にしておく
     if (!faculty || !admissionType) {
       setIsOfficial(false);
       return;
@@ -101,7 +101,7 @@ function HomeContent() {
       }
     }
 
-    // 辞書に載っていないイレギュラーな組み合わせだった場合は仮登録にする
+    // 辞書に載っていないイレギュラーな組み合わせだった場合は登録にする
     if (!targetDateStr) {
       setIsOfficial(false);
       return;
@@ -112,9 +112,9 @@ function HomeContent() {
     const now = new Date();
 
     if (now >= announcementDate) {
-      setIsOfficial(true);   // 発表日を過ぎているなら【本登録モード】に切り替え
+      setIsOfficial(true);   // 発表日を過ぎているなら【予約モード】に切り替え
     } else {
-      setIsOfficial(false);  // まだ発表日前なら【仮登録モード】のまま
+      setIsOfficial(false);  // まだ発表日前なら【登録モード】のまま
     }
   }, [faculty, department, admissionType]);
 
@@ -249,7 +249,7 @@ function HomeContent() {
         return;
       }
       if (!lastName || !firstName || !lastNameKana || !firstNameKana || !email || !phone || !city) {
-        alert('本登録には全必須項目を入力してください');
+        alert('予約には全必須項目を入力してください');
         return;
       }
     }
@@ -295,8 +295,8 @@ function HomeContent() {
       const ticketUrl = `${window.location.origin}/admin/ticket?id=${insertedData.id}`;
 
       const messageText = isOfficial
-        ? `【来場予約（本登録）が確定しました】\n\n合格おめでとうございます！🎉\n応援センターの予約を受付いたしました。\n\n形式: ${targetSlot?.event_type || '対面'}\n日時: ${dateStr}~\nお名前: ${lastName} 様\n\n👇当日の受付票はこちら（スマホでご提示ください）\n${ticketUrl}`
-        : `【仮登録が確定しました】\n\nお名前: ${displayName} 様\n\n山梨大学への合格をご祈念しております！`;
+        ? `【来場予約が確定しました】\n\n合格おめでとうございます！🎉\n応援センターの予約を受付いたしました。\n\n形式: ${targetSlot?.event_type || '対面'}\n日時: ${dateStr}~\nお名前: ${lastName} 様\n\n👇当日の受付票はこちら（スマホでご提示ください）\n${ticketUrl}`
+        : `【登録が完了しました】\n\nお名前: ${displayName} 様\n\n山梨大学への合格をご祈念しております！`;
 
       await liff.sendMessages([{ type: 'text', text: messageText }]);
       liff.closeWindow();
@@ -341,9 +341,9 @@ function HomeContent() {
     <main className="min-h-screen bg-gray-50 p-4 pb-28 font-sans text-gray-800">
       <header className="mb-6 text-center">
         <h1 className="text-xl font-bold text-green-600">
-          {isOfficial ? '【合格者対象】本登録フォーム' : '予約フォーム（仮登録）'}
+          {isOfficial ? '【合格者対象】予約フォーム' : '登録フォーム'}
         </h1>
-        <p className="text-xs text-gray-500 mt-1">※合格発表後に自動で本登録に切り替わります</p>
+        <p className="text-xs text-gray-500 mt-1">※合格発表後に自動で予約に切り替わります</p>
       </header>
 
       {existingReservation && (
@@ -361,7 +361,7 @@ function HomeContent() {
       {/* 🌟 1. 志望情報 / 入学先情報（必須） */}
       <section className="mb-6 rounded-xl bg-white p-4 shadow-sm border-l-4 border-blue-500">
         <h2 className="mb-4 font-semibold text-gray-700 border-b pb-2">
-          {/* 本登録時は「入学予定の情報」、仮登録時は「志望情報」に切り替え */}
+          {/* 予約時は「入学予定の情報」、登録時は「志望情報」に切り替え */}
           {isOfficial ? '1. 入学予定の情報（必須）' : '1. 志望情報（必須）'}
         </h2>
 
@@ -383,7 +383,7 @@ function HomeContent() {
 
         <div className="mb-2">
           <label className="block text-sm font-bold mb-1 text-gray-600">
-            {/* 本登録時は「合格した」、仮登録時は「受験（予定）の」に切り替え */}
+            {/* 予約時は「合格した」、登録時は「受験（予定）の」に切り替え */}
             {isOfficial ? '合格した入試区分' : '受験（予定）の入試区分'} <span className="text-red-500">*</span>
           </label>
           <select
@@ -409,7 +409,7 @@ function HomeContent() {
         </div>
       </section>
 
-      {/* 2. 本登録モードのときだけ予約枠を表示する */}
+      {/* 2. 予約モードのときだけ予約枠を表示する */}
       {isOfficial && (
         <section className="mb-6 rounded-xl bg-white p-4 shadow-sm animate-fade-in">
           <h2 className="mb-1 font-semibold text-gray-700">2. ご希望の日時を選択 <span className="text-red-500">*</span></h2>
@@ -467,7 +467,7 @@ function HomeContent() {
         </section>
       )}
 
-      {/* 3. 来場者情報の入力（名前やメアドは本登録のみ出現） */}
+      {/* 3. 来場者情報の入力（名前やメアドは予約のみ出現） */}
       <section className="mb-6 rounded-xl bg-white p-4 shadow-sm">
         <h2 className="mb-4 font-semibold text-gray-700 border-b pb-2">{isOfficial ? '3. 来場者情報の入力' : '2. 追加アンケート'}</h2>
 

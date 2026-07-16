@@ -17,60 +17,27 @@ function ScannerContent() {
     const [scanResult, setScanResult] = useState<'success' | 'already' | 'unregistered' | 'error' | null>(null);
     const [scannedStudent, setScannedStudent] = useState<any>(null);
 
-    // 読み取り成功時の「ピロリン♪」音を生成する関数
-    const playSuccessSound = () => {
-        try {
-            const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-            const ctx = new AudioContext();
+    // 効果音のmp3ファイル。差し替えたい場合は public/sounds/ 内の同名ファイルを置き換えてください。
+    const successAudioRef = useRef<HTMLAudioElement | null>(null);
+    const errorAudioRef = useRef<HTMLAudioElement | null>(null);
 
-            // 最初の「ピ」の音（少し低め）
-            const osc1 = ctx.createOscillator();
-            const gain1 = ctx.createGain();
-            osc1.type = 'sine';
-            osc1.frequency.setValueAtTime(880, ctx.currentTime);
-            gain1.gain.setValueAtTime(0.1, ctx.currentTime);
-            gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-            osc1.connect(gain1);
-            gain1.connect(ctx.destination);
-            osc1.start(ctx.currentTime);
-            osc1.stop(ctx.currentTime + 0.1);
+    useEffect(() => {
+        successAudioRef.current = new Audio('/sounds/success.mp3');
+        errorAudioRef.current = new Audio('/sounds/error.mp3');
+    }, []);
 
-            // 続く「ロリン♪」の音（高め）
-            const osc2 = ctx.createOscillator();
-            const gain2 = ctx.createGain();
-            osc2.type = 'sine';
-            osc2.frequency.setValueAtTime(1760, ctx.currentTime + 0.1);
-            gain2.gain.setValueAtTime(0.1, ctx.currentTime + 0.1);
-            gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
-            osc2.connect(gain2);
-            gain2.connect(ctx.destination);
-            osc2.start(ctx.currentTime + 0.1);
-            osc2.stop(ctx.currentTime + 0.4);
-        } catch (e) {
-            console.error("Audio API がサポートされていないか、エラーが発生しました", e);
-        }
+    // 指定した音声を頭出しして再生する共通関数
+    const playSound = (audio: HTMLAudioElement | null) => {
+        if (!audio) return;
+        audio.currentTime = 0;
+        audio.play().catch((e) => console.error('効果音の再生に失敗しました', e));
     };
 
-    // 読み取り失敗時の「ブブッ」音を生成する関数（おまけ）
-    const playErrorSound = () => {
-        try {
-            const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-            const ctx = new AudioContext();
+    // 読み取り成功時の「ピロリン♪」音
+    const playSuccessSound = () => playSound(successAudioRef.current);
 
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = 'square';
-            osc.frequency.setValueAtTime(150, ctx.currentTime);
-            gain.gain.setValueAtTime(0.1, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(ctx.currentTime);
-            osc.stop(ctx.currentTime + 0.3);
-        } catch (e) {
-            console.error("Audio error", e);
-        }
-    };
+    // 読み取り失敗時の「ブブッ」音
+    const playErrorSound = () => playSound(errorAudioRef.current);
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -105,7 +72,7 @@ function ScannerContent() {
                 if (data.status === '受付済') {
                     playSuccessSound();
                     setScanResult('already');
-                } else if (data.status === '仮登録') {
+                } else if (data.status === '登録') {
                     playErrorSound();
                     setScanResult('unregistered');
                 } else {
@@ -214,8 +181,8 @@ function ScannerContent() {
                         {scanResult === 'unregistered' && (
                             <div className="mb-6">
                                 <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-4xl mx-auto mb-3">!</div>
-                                <h1 className="text-xl font-bold text-red-600">本登録が完了していません</h1>
-                                <p className="text-sm text-gray-500 mt-2">（仮登録の状態です）</p>
+                                <h1 className="text-xl font-bold text-red-600">予約が完了していません</h1>
+                                <p className="text-sm text-gray-500 mt-2">（登録のみの状態です）</p>
                             </div>
                         )}
 
