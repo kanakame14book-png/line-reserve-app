@@ -45,8 +45,8 @@ function CheckinContent() {
             // すでに受付済みの場合は二重更新しない
             if (resData.status === '受付済') {
                 setCheckinStatus('already');
-            } else if (resData.status === '仮登録') {
-                // 本登録が済んでいない（仮登録の）人は受付できない。スキャナー経路と挙動を揃える。
+            } else if (resData.status === '登録') {
+                // 予約が済んでいない（登録のみの）人は受付できない。スキャナー経路と挙動を揃える。
                 setCheckinStatus('unregistered');
             } else {
                 // ステータスを「受付済」に更新
@@ -106,8 +106,8 @@ function CheckinContent() {
                 {checkinStatus === 'unregistered' && (
                     <div className="mb-6">
                         <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-4xl mx-auto mb-3">!</div>
-                        <h1 className="text-xl font-bold text-red-600">本登録が完了していません</h1>
-                        <p className="text-sm text-gray-500 mt-2">（仮登録の状態です）</p>
+                        <h1 className="text-xl font-bold text-red-600">予約が完了していません</h1>
+                        <p className="text-sm text-gray-500 mt-2">（登録のみの状態です）</p>
                     </div>
                 )}
 

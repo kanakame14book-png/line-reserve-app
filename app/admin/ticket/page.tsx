@@ -60,8 +60,8 @@ function TicketContent() {
     const qrValue = encodeURIComponent(`${window.location.origin}/admin/checkin?id=${reservation.id}`);
     const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${qrValue}`;
 
-    // 受付後（受付済）も予約確定者なので、本登録と同様に予約日時を表示する（Issue #14）
-    const isOfficial = reservation.status === '本登録' || reservation.status === '受付済';
+    // 受付後（受付済）も予約確定者なので、予約と同様に予約日時を表示する（Issue #14）
+    const isOfficial = reservation.status === '予約' || reservation.status === '受付済';
 
     return (
         <main className="min-h-screen bg-gray-50 py-10 px-4 flex flex-col items-center justify-start font-sans text-gray-800 print:bg-white print:py-0">
@@ -124,8 +124,8 @@ function TicketContent() {
                     ) : (
                         <div>
                             <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">ステータス</label>
-                            <p className="text-sm font-semibold text-amber-700 mt-0.5">仮登録（合格発表前）</p>
-                            <p className="text-xs text-gray-400 mt-0.5">※本登録移行時に日時が決定します。</p>
+                            <p className="text-sm font-semibold text-amber-700 mt-0.5">登録（合格発表前）</p>
+                            <p className="text-xs text-gray-400 mt-0.5">※予約移行時に日時が決定します。</p>
                         </div>
                     )}
                 </div>
