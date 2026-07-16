@@ -295,7 +295,7 @@ function HomeContent() {
       const ticketUrl = `${window.location.origin}/admin/ticket?id=${insertedData.id}`;
 
       const messageText = isOfficial
-        ? `【来場予約が確定しました】\n\n合格おめでとうございます！🎉\n応援センターの予約を受付いたしました。\n\n形式: ${targetSlot?.event_type || '対面'}\n日時: ${dateStr}~\nお名前: ${lastName} 様\n\n👇当日の受付票はこちら（スマホでご提示ください）\n${ticketUrl}`
+        ? `【来場予約が確定しました】\n\n合格おめでとうございます！🎉\n入学準備会の予約を受付いたしました。\n\n形式: ${targetSlot?.event_type || '対面'}\n日時: ${dateStr}~\nお名前: ${lastName} 様\n\n👇当日の受付票はこちら（スマホでご提示ください）\n${ticketUrl}`
         : `【登録が完了しました】\n\nお名前: ${displayName} 様\n\n山梨大学への合格をご祈念しております！`;
 
       await liff.sendMessages([{ type: 'text', text: messageText }]);

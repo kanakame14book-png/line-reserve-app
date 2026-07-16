@@ -88,8 +88,8 @@ function TicketContent() {
                         }`}>
                         来場受付票（{reservation.status}）
                     </span>
-                    <h1 className="text-xl font-bold text-gray-900 tracking-wider">山梨大学 工学部</h1>
-                    <p className="text-xs text-gray-400 mt-1">Orientation & Laboratory Tour</p>
+                    <h1 className="text-xl font-bold text-gray-900 tracking-wider">山梨大学生協</h1>
+                    <p className="text-xs text-gray-400 mt-1">Welcome Event for New Students</p>
                 </div>
 
                 <div className="space-y-4 border-t border-b border-gray-100 py-4 mb-6 relative print:border-gray-300">
