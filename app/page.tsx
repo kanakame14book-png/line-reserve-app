@@ -339,7 +339,7 @@ function HomeContent() {
       phone && isValidPhone(phone) &&
       city) : true);
 
-  if (liffError) return <div className="p-4 text-red-500">LIFFエラー: {liffError}</div>;
+  if (liffError) return <div className="p-8 text-center font-bold text-ng">LIFFエラー: {liffError}</div>;
 
   // =========================================================================
   // 8. 【画面の描画（JSX）】
@@ -462,45 +462,36 @@ function HomeContent() {
                           <span className="text-lg font-bold">{timeStr} 〜</span>
                         </div>
                       </div>
-                      <div>
-                        <span className="font-bold mr-2">{dateStr}</span>
-                        <span className="text-lg font-semibold">{timeStr} 〜</span>
-                      </div>
-                    </div>
-                    <div className="text-xs font-medium">
-                      {isFull ? <span className="text-red-500 font-bold bg-red-50 px-2 py-1 rounded">満席</span> : <span className="text-gray-500 bg-gray-50 px-2 py-1 rounded">残り {remaining} 枠</span>}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </section>
-      )}
+                      <span className="flex-none text-xs font-bold">
+                        {/* 満席は色だけでなく文言でも分かるようにする */}
+                        {isFull
+                          ? <span className="rounded-full bg-ng-soft px-2.5 py-1 text-ng">満席</span>
+                          : <span className="rounded-full bg-band px-2.5 py-1 text-ink">残り {remaining} 枠</span>}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
 
-      {/* 3. 来場者情報の入力（名前やメアドは予約のみ出現） */}
-      <section className="mb-6 rounded-xl bg-white p-4 shadow-sm">
-        <h2 className="mb-4 font-semibold text-gray-700 border-b pb-2">{isOfficial ? '3. 来場者情報の入力' : '2. 追加アンケート'}</h2>
+        {/* 3. 来場者情報の入力（名前やメアドは予約のみ出現） */}
+        <section className={CARD}>
+          <h2 className="mb-4 text-[17px] font-extrabold">{isOfficial ? '3. 来場者情報の入力' : '2. 追加アンケート'}</h2>
 
-        <div className="mb-4">
-          <label className="block text-sm font-bold mb-1 text-gray-600">お住まいの都道府県 <span className="text-red-500">*</span></label>
-          <select value={prefecture} onChange={(e) => setPrefecture(e.target.value)} className="w-full p-2 border rounded-lg bg-white" required>
-            <option value="" disabled>選択してください</option>
-            <optgroup label="山梨県・隣接する都県">
-              {NEARBY_PREFECTURES.map((pref) => <option key={pref} value={pref}>{pref}</option>)}
-            </optgroup>
-            <optgroup label="その他の都道府県">
-              {OTHER_PREFECTURES.map((pref) => <option key={pref} value={pref}>{pref}</option>)}
-            </optgroup>
-          </select>
-        </div>
-
-        {isOfficial ? (
-          <div className="animate-fade-in">
-            <div className="mb-4">
-              <label className="block text-sm font-bold mb-1 text-gray-600">市区町村 <span className="text-red-500">*</span></label>
-              <input type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder="甲府市武田" className="w-full p-2 border rounded-lg" required />
-            </div>
+          <div className="mb-4">
+            <label className={LABEL}>お住まいの都道府県 <span className={REQUIRED}>*</span></label>
+            <select value={prefecture} onChange={(e) => setPrefecture(e.target.value)} className={FIELD} required>
+              <option value="" disabled>選択してください</option>
+              <optgroup label="山梨県・隣接する都県">
+                {NEARBY_PREFECTURES.map((pref) => <option key={pref} value={pref}>{pref}</option>)}
+              </optgroup>
+              <optgroup label="その他の都道府県">
+                {OTHER_PREFECTURES.map((pref) => <option key={pref} value={pref}>{pref}</option>)}
+              </optgroup>
+            </select>
+          </div>
 
           {isOfficial ? (
             <div className="animate-fade-in">
