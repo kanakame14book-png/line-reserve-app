@@ -150,7 +150,8 @@ function AdminContent() {
                 .eq('id', editingSlotId);
 
             if (error) {
-                alert('枠の更新に失敗しました: ' + error.message);
+                console.error('枠の更新に失敗しました:', error);
+                alert('枠の更新に失敗しました。時間をおいて再度お試しください。');
             } else {
                 alert('予約枠を更新しました！');
                 resetForm();
@@ -162,7 +163,8 @@ function AdminContent() {
                 .insert([{ start_time: startDateTime, capacity: capacity, event_type: eventType }]);
 
             if (error) {
-                alert('枠の作成に失敗しました: ' + error.message);
+                console.error('枠の作成に失敗しました:', error);
+                alert('枠の作成に失敗しました。時間をおいて再度お試しください。');
             } else {
                 alert('新しい予約枠を作成しました！');
                 resetForm();
@@ -198,7 +200,8 @@ function AdminContent() {
         if (!confirm('本当にこの枠を削除しますか？')) return;
         const { error } = await supabase.from('slots').delete().eq('id', id);
         if (error) {
-            alert('削除に失敗しました: ' + error.message);
+            console.error('枠の削除に失敗しました:', error);
+            alert('削除に失敗しました。時間をおいて再度お試しください。');
         } else {
             alert('削除しました。');
             if (editingSlotId === id) resetForm();
@@ -256,7 +259,8 @@ function AdminContent() {
             fetchReservations();
 
         } catch (error: any) {
-            alert('班分け処理中にエラーが発生しました: ' + error.message);
+            console.error('班分け処理中にエラーが発生しました:', error);
+            alert('班分け処理中にエラーが発生しました。時間をおいて再度お試しください。');
         } finally {
             setIsAssigning(false);
         }
@@ -268,7 +272,8 @@ function AdminContent() {
             if (error) throw error;
             setReservations(prev => prev.map(res => res.id === id ? { ...res, group_name: newGroup } : res));
         } catch (err: any) {
-            alert('班の更新に失敗しました: ' + err.message);
+            console.error('班の更新に失敗しました:', err);
+            alert('班の更新に失敗しました。時間をおいて再度お試しください。');
         }
     };
 
@@ -278,7 +283,8 @@ function AdminContent() {
             if (error) throw error;
             setReservations(prev => prev.map(res => res.id === id ? { ...res, attendee_count: newCount } : res));
         } catch (err: any) {
-            alert('人数の更新に失敗しました: ' + err.message);
+            console.error('人数の更新に失敗しました:', err);
+            alert('人数の更新に失敗しました。時間をおいて再度お試しください。');
         }
     };
 
@@ -289,7 +295,8 @@ function AdminContent() {
             if (error) throw error;
             setReservations(prev => prev.map(res => res.id === id ? { ...res, status: newStatus } : res));
         } catch (err: any) {
-            alert('ステータスの更新に失敗しました: ' + err.message);
+            console.error('ステータスの更新に失敗しました:', err);
+            alert('ステータスの更新に失敗しました。時間をおいて再度お試しください。');
         }
     };
 

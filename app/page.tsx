@@ -229,7 +229,9 @@ function HomeContent() {
       alert(`${existingReservation.status}をキャンセルしました。`);
       liff.closeWindow();
     } catch (err: any) {
-      alert('キャンセル失敗: ' + err.message);
+      // エラーの詳細（テーブル名や制約名を含む）は利用者に見せず、コンソールにのみ残す
+      console.error('キャンセルに失敗しました:', err);
+      alert('キャンセルに失敗しました。時間をおいて再度お試しください。');
       setIsSubmitting(false);
     }
   };
@@ -287,7 +289,7 @@ function HomeContent() {
         status: currentStatusText,
       }], { onConflict: 'line_user_id' }).select().single();
 
-      if (error) throw new Error('データベースへの保存に失敗しました: ' + error.message);
+      if (error) throw error;
 
       const dateStr = targetSlot
         ? new Date(targetSlot.start_time).toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -302,7 +304,9 @@ function HomeContent() {
       liff.closeWindow();
 
     } catch (err: any) {
-      alert('エラーが発生しました: ' + err.message);
+      // エラーの詳細（テーブル名や制約名を含む）は利用者に見せず、コンソールにのみ残す
+      console.error(`${currentStatusText}の送信に失敗しました:`, err);
+      alert(`${currentStatusText}の送信に失敗しました。時間をおいて再度お試しください。`);
       setIsSubmitting(false);
     }
   };
