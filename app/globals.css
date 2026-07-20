@@ -1,26 +1,70 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
+/*
+ * 入学準備会[GUIDEs] のデザイントークン。
+ * 値は受領したFigmaデザイン（事前予約フォーム）から実測したもの。
+ * 画面ごとに色を足さず、必ずここのトークンを使う。
+ * 紙と屋外での視認性を優先した明るい配色のため、ダークテーマは用意しない。
+ */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* ヘッダ帯のミント */
+  --color-band: #dffaf3;
+  /* 文字色。濃紫1色で通し、階層はサイズと太さで作る */
+  --color-ink: #3b0471;
+  /* プレースホルダなど、濃紫を弱めたい箇所 */
+  --color-ink-soft: #8e7bab;
+  /* 入力欄などの枠線 */
+  --color-line: #c2acd8;
+  /* 主ボタンの縦グラデーション */
+  --color-brand-top: #8b4ec8;
+  --color-brand-bottom: #54307a;
+  /* シンボルマークから採った差し色 */
+  --color-accent: #d5386d;
+  --color-accent-soft: #ffe9f6;
+  /* 受付の判定結果に使う色。色だけに頼らず記号と文言も添える */
+  --color-ok: #0e8f6e;
+  --color-ok-soft: #eafaf4;
+  --color-ng: #c2274b;
+  --color-ng-soft: #fdeef2;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: #ffffff;
+  color: var(--color-ink);
+  font-family: var(--font-geist-sans), system-ui, "Hiragino Kaku Gothic ProN",
+    "Yu Gothic", sans-serif;
+}
+
+/* 主ボタンの背景。グラデーションの向きを1か所で管理する */
+.bg-brand {
+  background-image: linear-gradient(
+    180deg,
+    var(--color-brand-top),
+    var(--color-brand-bottom)
+  );
+}
+
+/* 予約モードへの切り替えなど、要素が差し込まれるときの導入 */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.24s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in {
+    animation: none;
+  }
 }
