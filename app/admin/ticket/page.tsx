@@ -2,6 +2,7 @@
 import { supabase } from '../../../supabase';
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { QRCodeSVG } from 'qrcode.react';
 import { tryCloseWindow } from '../../lib/close';
 import { QrTrademark } from '../../components/QrTrademark';
 
@@ -58,8 +59,7 @@ function TicketContent() {
 
     // QRには予約ID単体を埋め込む。当日の受付は /admin/scanner のカメラで読み取り、
     // scanner側がこのIDから予約を特定して受付する（旧 /admin/checkin ページは廃止済み）。
-    const qrValue = encodeURIComponent(reservation.id);
-    const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${qrValue}`;
+    const qrValue = reservation.id;
 
     // 受付後（受付済）も予約確定者なので、予約と同様に予約日時を表示する（Issue #14）
     const isOfficial = reservation.status === '予約' || reservation.status === '受付済';
@@ -133,8 +133,8 @@ function TicketContent() {
 
                 <div className="flex flex-col items-center justify-center text-center relative">
                     <div className="bg-gray-50 p-2 rounded-xl border border-gray-100 mb-2 print:bg-white print:border-gray-300">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={qrSrc} alt="Check-in QR Code" className="w-32 h-32" />
+                        {/* QRはブラウザ内で生成する。外部APIに予約IDを送らず、オフラインでも表示できる */}
+                        <QRCodeSVG value={qrValue} size={128} title="受付用QRコード" className="w-32 h-32" />
                     </div>
                     <p className="text-[10px] text-gray-400 tracking-widest">ID: {reservation.id}</p>
                     <p className="text-xs text-gray-500 mt-2 font-medium">当日はこのQRコードを受付にご提示ください</p>
