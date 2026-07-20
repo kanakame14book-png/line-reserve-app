@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense, useRef } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { tryCloseWindow } from '../../lib/close';
 import { QrTrademark } from '../../components/QrTrademark';
-// 🌟 useRouter は不要になったので削除しました！
+// useRouter は不要になったので削除しました
 
 function ScannerContent() {
     const [session, setSession] = useState<any>(null);
