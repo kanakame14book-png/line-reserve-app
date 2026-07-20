@@ -2,6 +2,7 @@
 import { supabase } from '../../../supabase';
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { QRCodeSVG } from 'qrcode.react';
 import { tryCloseWindow } from '../../lib/close';
 import { QrTrademark } from '../../components/QrTrademark';
 
@@ -13,6 +14,8 @@ function TicketContent() {
     const [slot, setSlot] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [closeHint, setCloseHint] = useState(false); // 閉じるボタンが効かない環境向け案内
+    const [cancelling, setCancelling] = useState(false);
+    const [cancelled, setCancelled] = useState(false);
 
     useEffect(() => {
         if (!resId) {
@@ -53,13 +56,48 @@ function TicketContent() {
         window.print();
     };
 
+    // キャンセルは app/page.tsx の handleCancelReservation と同じく行を完全に削除する。
+    // 行を残すと予約枠の空き集計や管理画面の一覧から除外する対応が別途必要になるため。
+    const handleCancel = async () => {
+        if (!confirm(`この${reservation.status}をキャンセルします。取り消しはできません。よろしいですか？`)) return;
+        setCancelling(true);
+        try {
+            const { error } = await supabase.from('reservations').delete().eq('id', reservation.id);
+            if (error) throw error;
+            setCancelled(true);
+        } catch (err) {
+            // エラーの詳細（テーブル名や制約名を含む）は利用者に見せず、コンソールにのみ残す
+            console.error('キャンセルに失敗しました:', err);
+            alert('キャンセルに失敗しました。時間をおいて再度お試しください。');
+            setCancelling(false);
+        }
+    };
+
     if (loading) return <div className="p-8 text-center text-gray-500">受付票を生成中...</div>;
     if (!reservation) return <div className="p-8 text-center text-red-500 font-bold">⚠️ 該当する予約データが見つかりません。</div>;
 
+    if (cancelled) {
+        return (
+            <main className="min-h-screen bg-gray-50 py-10 px-4 flex flex-col items-center justify-start font-sans text-gray-800">
+                <div className="w-full max-w-md bg-white border border-gray-200 rounded-2xl shadow-sm p-6 text-center">
+                    <h1 className="text-lg font-bold text-gray-900 mb-2">キャンセルが完了しました</h1>
+                    <p className="text-sm text-gray-500 mb-6">この受付票は無効になりました。再度お申し込みいただく場合はLINEのフォームからお願いします。</p>
+                    <button onClick={() => tryCloseWindow(() => setCloseHint(true))} className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-4 py-2 rounded-lg shadow-sm transition-all">
+                        閉じる
+                    </button>
+                    {closeHint && (
+                        <p className="mt-4 rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
+                            このタブは自動で閉じられませんでした。ブラウザ（またはLINE）の「×」ボタンで閉じてください。
+                        </p>
+                    )}
+                </div>
+            </main>
+        );
+    }
+
     // QRには予約ID単体を埋め込む。当日の受付は /admin/scanner のカメラで読み取り、
     // scanner側がこのIDから予約を特定して受付する（旧 /admin/checkin ページは廃止済み）。
-    const qrValue = encodeURIComponent(reservation.id);
-    const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${qrValue}`;
+    const qrValue = reservation.id;
 
     // 受付後（受付済）も予約確定者なので、予約と同様に予約日時を表示する（Issue #14）
     const isOfficial = reservation.status === '予約' || reservation.status === '受付済';
@@ -133,8 +171,8 @@ function TicketContent() {
 
                 <div className="flex flex-col items-center justify-center text-center relative">
                     <div className="bg-gray-50 p-2 rounded-xl border border-gray-100 mb-2 print:bg-white print:border-gray-300">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={qrSrc} alt="Check-in QR Code" className="w-32 h-32" />
+                        {/* QRはブラウザ内で生成する。外部APIに予約IDを送らず、オフラインでも表示できる */}
+                        <QRCodeSVG value={qrValue} size={128} title="受付用QRコード" className="w-32 h-32" />
                     </div>
                     <p className="text-[10px] text-gray-400 tracking-widest">ID: {reservation.id}</p>
                     <p className="text-xs text-gray-500 mt-2 font-medium">当日はこのQRコードを受付にご提示ください</p>
@@ -142,6 +180,16 @@ function TicketContent() {
                 </div>
 
             </div>
+
+            {/* 受付済みは来場実績が消えてしまうためキャンセルさせない */}
+            {reservation.status !== '受付済' && (
+                <div className="w-full max-w-md mt-6 text-center print:hidden">
+                    <button onClick={handleCancel} disabled={cancelling} className="bg-white border border-red-200 hover:bg-red-50 disabled:opacity-50 text-red-500 text-xs font-bold px-4 py-2 rounded-lg shadow-sm transition-all">
+                        {cancelling ? 'キャンセル処理中...' : `この${reservation.status}をキャンセルする`}
+                    </button>
+                    <p className="text-[11px] text-gray-400 mt-2">キャンセルすると元に戻せません。</p>
+                </div>
+            )}
         </main>
     );
 }
