@@ -56,8 +56,9 @@ function TicketContent() {
     if (loading) return <div className="p-8 text-center text-gray-500">受付票を生成中...</div>;
     if (!reservation) return <div className="p-8 text-center text-red-500 font-bold">⚠️ 該当する予約データが見つかりません。</div>;
 
-    // 🌟 より高速で安定したQRコード生成APIに変更（サイズも200x200にアップ）
-    const qrValue = encodeURIComponent(`${window.location.origin}/admin/checkin?id=${reservation.id}`);
+    // QRには予約ID単体を埋め込む。当日の受付は /admin/scanner のカメラで読み取り、
+    // scanner側がこのIDから予約を特定して受付する（旧 /admin/checkin ページは廃止済み）。
+    const qrValue = encodeURIComponent(reservation.id);
     const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${qrValue}`;
 
     // 受付後（受付済）も予約確定者なので、予約と同様に予約日時を表示する（Issue #14）

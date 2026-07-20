@@ -39,7 +39,6 @@
 | `app/page.tsx` | 受験生向けの登録・予約フォーム（LIFF内で起動） |
 | `app/admin/page.tsx` | 管理画面（要ログイン）。予約一覧・枠管理・受付・班分け |
 | `app/admin/scanner/page.tsx` | QRコード受付（カメラでスキャン） |
-| `app/admin/checkin/page.tsx` | 受付票URLを開いたときの受付処理 |
 | `app/admin/ticket/page.tsx` | 受付票（QRコード）の表示・印刷 |
 | `data/options.ts` | 学部・学科・入試区分・合格発表日などのマスタ定義 |
 | `supabase.ts` | Supabaseクライアントの初期化 |
