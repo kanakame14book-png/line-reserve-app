@@ -24,9 +24,12 @@
   /* シンボルマークから採った差し色 */
   --color-accent: #d5386d;
   --color-accent-soft: #ffe9f6;
-  /* 受付の判定結果に使う色。色だけに頼らず記号と文言も添える */
+  /* 受付の判定結果に使う色。色だけに頼らず記号と文言も添える。
+     受付済みの再スキャンは失敗ではないため、成功・注意・失敗の3段階に分ける */
   --color-ok: #0e8f6e;
   --color-ok-soft: #eafaf4;
+  --color-warn: #a35a00;
+  --color-warn-soft: #fff4e0;
   --color-ng: #c2274b;
   --color-ng-soft: #fdeef2;
 }
