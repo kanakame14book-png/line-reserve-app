@@ -56,6 +56,25 @@ export const FACULTY_DEPARTMENT_MAP: Record<string, string[]> = {
 // 学部のリスト（辞書のキーから自動生成）
 export const FACULTIES = Object.keys(FACULTY_DEPARTMENT_MAP);
 
+// 事前登録（合格発表前の「登録」）完了時に配布する LINE 公式アカウントのクーポン。
+// オープンキャンパスは3日間あり、各日で別クーポン（その日16:00まで有効）を配る。
+// キーは開催日（JSTの YYYY-MM-DD）、値はその日ぶんのクーポンURL。
+// 有効期限そのものは各クーポンの「有効期間」を OA Manager 側で設定する（購買ドリンク20円引き・当日16:00まで）。
+// ここに無い日に登録した人にはクーポンを付けない（開催日以外や期限切れリンクを送らないため）。
+// 予約（合格発表後）には配らない＝事前登録限定の特典。
+export const OPEN_CAMPUS_COUPONS: Record<string, string> = {
+  '2026-08-01': 'https://lin.ee/q38xwUE', // 1日目
+  '2026-08-06': 'https://lin.ee/Zq3Xyqt', // 2日目
+  '2026-08-07': 'https://lin.ee/8udW7ML', // 3日目
+};
+
+// 指定日時（既定は現在）のJSTの日付に対応するクーポンURLを返す。開催日以外なら空文字。
+// 端末のタイムゾーンに依存しないよう、日付キーは必ず Asia/Tokyo で組み立てる。
+export function getTodayCouponUrl(now: Date = new Date()): string {
+  const todayJst = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo' }).format(now);
+  return OPEN_CAMPUS_COUPONS[todayJst] ?? '';
+}
+
 // 志望度リスト
 export const MOTIVATION_LEVELS = [
   "第1志望",
