@@ -14,7 +14,8 @@ import {
   MEDICINE_NURSING_ADMISSION_TYPES,
   MOTIVATION_LEVELS,
   Slot,
-  DETAILED_ANNOUNCEMENT_DATES
+  DETAILED_ANNOUNCEMENT_DATES,
+  getTodayCouponUrl
 } from '../data/options';
 
 function HomeContent() {
@@ -299,9 +300,16 @@ function HomeContent() {
         : '';
       const ticketUrl = `${window.location.origin}/admin/ticket?id=${insertedData.id}`;
 
+      // 事前登録（登録）の完了メッセージ。オープンキャンパス開催日ならその日のクーポンを特典として付ける。
+      // 開催日以外は空文字が返るのでクーポン行は付かない。予約側には付けない＝事前登録限定の特典。
+      const couponUrl = getTodayCouponUrl();
+      const registrationText = couponUrl
+        ? `【登録が完了しました】\n\nお名前: ${displayName} 様\n\n山梨大学への合格をご祈念しております！\n\n🎁 事前登録特典のクーポンはこちら\n${couponUrl}`
+        : `【登録が完了しました】\n\nお名前: ${displayName} 様\n\n山梨大学への合格をご祈念しております！`;
+
       const messageText = isOfficial
         ? `【来場予約が確定しました】\n\n合格おめでとうございます！🎉\n入学準備会の予約を受付いたしました。\n\n形式: ${targetSlot?.event_type || '対面'}\n日時: ${dateStr}~\nお名前: ${lastName} 様\n\n👇当日の受付票はこちら（スマホでご提示ください）\n${ticketUrl}`
-        : `【登録が完了しました】\n\nお名前: ${displayName} 様\n\n山梨大学への合格をご祈念しております！`;
+        : registrationText;
 
       await liff.sendMessages([{ type: 'text', text: messageText }]);
       liff.closeWindow();
